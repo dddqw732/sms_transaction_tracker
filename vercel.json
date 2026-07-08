@@ -13,10 +13,6 @@
     }
   ],
   "env": {
-    "SUPABASE_URL": "your-supabase-url-here",
-    "SUPABASE_SERVICE_ROLE_KEY": "your-supabase-service-role-key-here",
-    "SUPABASE_PROJECT_REF": "your-supabase-project-ref-here",
-    "SUPABASE_ANON_KEY": "your-supabase-anon-key-here",
-    "JWT_SECRET": "your-jwt-secret-here"
+    "JWT_SECRET": "dev-change-me"
   }
 }
