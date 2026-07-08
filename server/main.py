@@ -245,16 +245,17 @@ async def lifespan(app: FastAPI):
 
     try:
         database.init_db()
+        print("[OK] Database initialized.")
     except Exception as e:
         print(f"[WARNING] Database init failed (Supabase may not be configured): {e}")
 
     load_telethon_env()
 
+    company = None
     try:
         company = choose_telethon_company()
     except Exception as e:
-        print(f"[WARNING] Could not query companies: {e}")
-        company = None
+        print(f"[WARNING] Could not query companies (Supabase may not be configured): {e}")
 
     if company:
         telethon_company_id = int(company["id"])
