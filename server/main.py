@@ -16,7 +16,14 @@ from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from passlib.context import CryptContext
 from pydantic import BaseModel, Field
-from telethon import TelegramClient, events
+# telethon is optional — only needed for Telegram SMS forwarding
+try:
+    from telethon import TelegramClient, events
+    TELETHON_AVAILABLE = True
+except ImportError:
+    TelegramClient = None  # type: ignore
+    events = None  # type: ignore
+    TELETHON_AVAILABLE = False
 
 import database
 from sms_parser import parse_sms
@@ -236,42 +243,58 @@ async def process_and_broadcast(msg_text: str, company_id: int):
 async def lifespan(app: FastAPI):
     global telethon_client, telethon_company_id
 
-    database.init_db()
+    try:
+        database.init_db()
+    except Exception as e:
+        print(f"[WARNING] Database init failed (Supabase may not be configured): {e}")
+
     load_telethon_env()
 
-    company = choose_telethon_company()
+    try:
+        company = choose_telethon_company()
+    except Exception as e:
+        print(f"[WARNING] Could not query companies: {e}")
+        company = None
+
     if company:
         telethon_company_id = int(company["id"])
 
     api_id = os.environ.get("TELEGRAM_API_ID") or (str(company.get("telegram_api_id")) if company else None)
     api_hash = os.environ.get("TELEGRAM_API_HASH") or (str(company.get("telegram_api_hash")) if company else None)
 
-    if api_id and api_hash and Path("telethon.session").exists() and telethon_company_id is not None:
-        telethon_client = TelegramClient("telethon", int(api_id), api_hash)
+    if TELETHON_AVAILABLE and api_id and api_hash and Path("telethon.session").exists() and telethon_company_id is not None:
+        try:
+            telethon_client = TelegramClient("telethon", int(api_id), api_hash)
 
-        @telethon_client.on(events.NewMessage(incoming=True))
-        async def handle_new_message(event):
-            sender = getattr(event, 'chat', None)
-            sender_name = getattr(sender, 'username', None) or getattr(sender, 'title', None) or str(sender)
-            print(f"[Telegram] Message from '{sender_name}': {(event.raw_text or '')[:120]}")
-            if sender_name and 'wize' in str(sender_name).lower():
+            @telethon_client.on(events.NewMessage(incoming=True))
+            async def handle_new_message(event):
+                sender = getattr(event, 'chat', None)
+                sender_name = getattr(sender, 'username', None) or getattr(sender, 'title', None) or str(sender)
+                print(f"[Telegram] Message from '{sender_name}': {(event.raw_text or '')[:120]}")
+                if sender_name and 'wize' in str(sender_name).lower():
+                    await process_and_broadcast(event.raw_text or "", telethon_company_id)
+                elif 'smforward' in str(sender_name).lower() or 'smsforward' in str(sender_name).lower():
+                    await process_and_broadcast(event.raw_text or "", telethon_company_id)
+
+            @telethon_client.on(events.NewMessage(incoming=True, chats="WizeSMSForwardBot"))
+            async def handle_wize_message(event):
                 await process_and_broadcast(event.raw_text or "", telethon_company_id)
-            elif 'smforward' in str(sender_name).lower() or 'smsforward' in str(sender_name).lower():
-                await process_and_broadcast(event.raw_text or "", telethon_company_id)
 
-        @telethon_client.on(events.NewMessage(incoming=True, chats="WizeSMSForwardBot"))
-        async def handle_wize_message(event):
-            await process_and_broadcast(event.raw_text or "", telethon_company_id)
-
-        await telethon_client.start()
-        print(f"[OK] Telethon running for company_id={telethon_company_id} (api_id={api_id})")
+            await telethon_client.start()
+            print(f"[OK] Telethon running for company_id={telethon_company_id} (api_id={api_id})")
+        except Exception as e:
+            print(f"[WARNING] Telethon failed to start: {e}")
+            telethon_client = None
     else:
-        print(f"[WARNING] Telethon not started. session={Path('telethon.session').exists()}, company_id={telethon_company_id}, api_id={'set' if api_id else 'missing'}")
+        print(f"[WARNING] Telethon not started. available={TELETHON_AVAILABLE}, session={Path('telethon.session').exists()}, company_id={telethon_company_id}, api_id={'set' if api_id else 'missing'}")
 
     yield
 
     if telethon_client:
-        await telethon_client.disconnect()
+        try:
+            await telethon_client.disconnect()
+        except Exception:
+            pass
 
 
 app = FastAPI(title="SMS Transaction Tracker API", lifespan=lifespan)
