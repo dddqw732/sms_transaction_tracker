@@ -3,9 +3,10 @@ uvicorn
 pydantic
 python-multipart
 websockets
-telethon
 openpyxl
 psycopg2-binary
 PyJWT
-passlib[bcrypt]
+passlib
+bcrypt
 supabase
+cryptography
