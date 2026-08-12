@@ -72,11 +72,43 @@ def test_health():
         print(f"   FAIL Server not reachable: {e}")
         return False
 
-def test_post_transactions():
+def test_auth():
+    print("\n1b. Testing authentication (Signup/Login)...")
+    company_payload = {
+        "company_name": "Test Company API",
+        "city": "Hargeisa",
+        "initial_subscription_plan": "Enterprise",
+        "password": "testpassword123",
+        "status": "Active"
+    }
+    r = requests.post(f"{BASE_URL}/api/auth/signup", json=company_payload, timeout=5)
+    if r.status_code == 200:
+        data = r.json()
+        token = data.get("access_token")
+        print(f"   OK Registered company '{data['company']['company_code']}'")
+        return token
+    
+    # If already created, login
+    login_payload = {
+        "company_code": "TES001",
+        "password": "testpassword123"
+    }
+    r = requests.post(f"{BASE_URL}/api/auth/login", json=login_payload, timeout=5)
+    if r.status_code == 200:
+        data = r.json()
+        token = data.get("access_token")
+        print(f"   OK Logged in company TES001")
+        return token
+        
+    print(f"   FAIL Auth failed: {r.status_code} {r.text}")
+    return None
+
+def test_post_transactions(token):
     print("\n2. Posting test transactions...")
+    headers = {"Authorization": f"Bearer {token}"}
     ids = []
     for txn in SAMPLE_TRANSACTIONS:
-        r = requests.post(f"{BASE_URL}/api/transactions", json=txn, timeout=5)
+        r = requests.post(f"{BASE_URL}/api/transactions", json=txn, headers=headers, timeout=5)
         if r.status_code in (200, 201):
             data = r.json()
             print(f"   OK Posted '{txn['type']} {txn['currency']} {txn['amount']}' -> id={data.get('id')}")
@@ -85,27 +117,30 @@ def test_post_transactions():
             print(f"   FAIL Failed: HTTP {r.status_code} — {r.text[:200]}")
     return ids
 
-def test_duplicate():
+def test_duplicate(token):
     print("\n3. Testing duplicate rejection...")
+    headers = {"Authorization": f"Bearer {token}"}
     txn = SAMPLE_TRANSACTIONS[0]  # already posted above
-    r = requests.post(f"{BASE_URL}/api/transactions", json=txn, timeout=5)
+    r = requests.post(f"{BASE_URL}/api/transactions", json=txn, headers=headers, timeout=5)
     if r.status_code == 400:
         print("   OK Duplicate correctly rejected (HTTP 400)")
     else:
         print(f"   FAIL Expected HTTP 400, got {r.status_code}")
 
-def test_get_all():
+def test_get_all(token):
     print("\n4. Testing GET /api/transactions...")
-    r = requests.get(f"{BASE_URL}/api/transactions", timeout=5)
+    headers = {"Authorization": f"Bearer {token}"}
+    r = requests.get(f"{BASE_URL}/api/transactions", headers=headers, timeout=5)
     if r.status_code == 200:
         data = r.json()
         print(f"   OK Retrieved {len(data)} transactions")
     else:
         print(f"   FAIL Failed: HTTP {r.status_code}")
 
-def test_filter_type():
+def test_filter_type(token):
     print("\n5. Testing filter by type=Received...")
-    r = requests.get(f"{BASE_URL}/api/transactions?type=Received", timeout=5)
+    headers = {"Authorization": f"Bearer {token}"}
+    r = requests.get(f"{BASE_URL}/api/transactions?type=Received", headers=headers, timeout=5)
     if r.status_code == 200:
         data = r.json()
         all_received = all(t['type'] == 'Received' for t in data)
@@ -113,18 +148,20 @@ def test_filter_type():
     else:
         print(f"   FAIL Failed: HTTP {r.status_code}")
 
-def test_search():
+def test_search(token):
     print("\n6. Testing search for 'Jane'...")
-    r = requests.get(f"{BASE_URL}/api/transactions?search=Jane", timeout=5)
+    headers = {"Authorization": f"Bearer {token}"}
+    r = requests.get(f"{BASE_URL}/api/transactions?search=Jane", headers=headers, timeout=5)
     if r.status_code == 200:
         data = r.json()
         print(f"   OK Search returned {len(data)} result(s): {[t['sender'] for t in data]}")
     else:
         print(f"   FAIL Failed: HTTP {r.status_code}")
 
-def test_sort_amount():
+def test_sort_amount(token):
     print("\n7. Testing sort by amount ascending...")
-    r = requests.get(f"{BASE_URL}/api/transactions?sort_by=amount&sort_order=asc", timeout=5)
+    headers = {"Authorization": f"Bearer {token}"}
+    r = requests.get(f"{BASE_URL}/api/transactions?sort_by=amount&sort_order=asc", headers=headers, timeout=5)
     if r.status_code == 200:
         data = r.json()
         amounts = [t['amount'] for t in data]
@@ -145,13 +182,18 @@ if __name__ == "__main__":
     if not test_health():
         print("\n  FAIL Server is not running. Start it first and retry.")
         sys.exit(1)
+        
+    token = test_auth()
+    if not token:
+        print("\n  FAIL Could not authenticate.")
+        sys.exit(1)
     
-    test_post_transactions()
-    test_duplicate()
-    test_get_all()
-    test_filter_type()
-    test_search()
-    test_sort_amount()
+    test_post_transactions(token)
+    test_duplicate(token)
+    test_get_all(token)
+    test_filter_type(token)
+    test_search(token)
+    test_sort_amount(token)
     
     print("\n" + "=" * 55)
     print("  All tests complete!")
