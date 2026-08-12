@@ -46,7 +46,4 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host "Starting uvicorn server on http://localhost:8000 ..."
-$uvArgs = @('-m','uvicorn','main:app','--host','0.0.0.0','--port','8000')
-# Start in a new process so it keeps running independently
-Start-Process -FilePath $python -ArgumentList $uvArgs -WorkingDirectory $scriptDir -NoNewWindow
-Write-Host "uvicorn started (process launched). Open http://localhost:8000 in your browser."
+& $python -m uvicorn main:app --host 0.0.0.0 --port 8000
