@@ -78,7 +78,8 @@ async function apiFetch(url, options = {}) {
     const headers = new Headers(options.headers || {});
     if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`);
 
-    const response = await fetch(url, { ...options, headers });
+    const fetchOpts = { credentials: 'include', ...options, headers };
+    const response = await fetch(url, fetchOpts);
 
     if (response.status === 401 || response.status === 403) {
         if (url !== '/api/auth/login' && url !== '/api/auth/signup' && url !== '/api/auth/me') {
@@ -94,6 +95,13 @@ window.apiFetch = apiFetch;
 function logoutToAuth(message = '') {
     accessToken = '';
     currentCompany = null;
+    dashboardInitialized = false;
+    allTransactions = [];
+    window.allTransactions = [];
+    if (pollInterval) {
+        clearInterval(pollInterval);
+        pollInterval = null;
+    }
     localStorage.removeItem('cashin_access_token');
     if (ws) {
         ws.close();
@@ -113,21 +121,23 @@ function setCompanyChip() {
 async function bootstrapAuth() {
     bindAuthUI();
 
-    if (!accessToken) {
-        showView('landing');
-        return;
-    }
-
     try {
         const res = await apiFetch('/api/auth/me');
         if (!res.ok) throw new Error('Session invalid');
         const payload = await readApiPayload(res);
+        if (payload.access_token) {
+            accessToken = payload.access_token;
+            localStorage.setItem('cashin_access_token', accessToken);
+        }
         currentCompany = payload.company;
         setCompanyChip();
         showView('dashboard');
         initDashboard();
     } catch {
-        logoutToAuth();
+        if (accessToken) {
+            localStorage.removeItem('cashin_access_token');
+            accessToken = '';
+        }
         showView('landing');
     }
 }
@@ -172,6 +182,7 @@ function bindAuthUI() {
         try {
             const res = await fetch('/api/auth/login', {
                 method: 'POST',
+                credentials: 'include',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ company_code: companyCode, password })
             });
@@ -201,21 +212,17 @@ function bindAuthUI() {
         const body = {
             company_name: document.getElementById('signup-company-name').value.trim(),
             city: document.getElementById('signup-city').value.trim(),
-            telegram_api_id: document.getElementById('signup-telegram-id').value.trim() || null,
-            telegram_api_hash: document.getElementById('signup-telegram-hash').value.trim() || null,
             initial_subscription_plan: document.getElementById('signup-plan').value,
             password: document.getElementById('signup-password').value,
             status: document.getElementById('signup-status').value
         };
 
-        if (!body.telegram_api_id || !body.telegram_api_hash) {
-            setAuthMessage('App api_id and App api_hash are required');
-            return;
-        }
+
 
         try {
             const res = await fetch('/api/auth/signup', {
                 method: 'POST',
+                credentials: 'include',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(body)
             });
@@ -281,7 +288,9 @@ function getProviderLogo(provider) {
     return null;
 }
 
-function createTransactionCard(txn) {
+let latestTxnId = null;
+
+function createTransactionCard(txn, isLatest = false) {
     const isReceived = txn.type === 'Received';
     const typeClass = isReceived ? 'received' : 'sent';
     const amountSign = isReceived ? '+' : '-';
@@ -296,9 +305,11 @@ function createTransactionCard(txn) {
 
     const primaryName = isReceived ? (txn.sender || 'Unknown') : (txn.receiver || 'Unknown');
     const primaryNumber = isReceived ? txn.sender_number : txn.receiver_number;
+    const latestClass = isLatest ? ' txn-latest' : '';
 
     return `
-        <div class="txn-card" onclick="showTxnDetails(${txn.id})">
+        <div class="txn-card${latestClass}" onclick="showTxnDetails(${txn.id})">
+            ${isLatest ? '<div class="txn-new-badge">NEW</div>' : ''}
             <div class="txn-icon ${iconClass}">${iconHtml}</div>
             <div class="txn-details">
                 <div class="txn-sender">
@@ -329,7 +340,7 @@ function renderLedger() {
     } else {
         ledgerEmpty.classList.add('hidden');
         ledgerList.classList.remove('hidden');
-        ledgerList.innerHTML = filteredTransactions.map(createTransactionCard).join('');
+        ledgerList.innerHTML = filteredTransactions.map((txn, i) => createTransactionCard(txn, i === 0 && txn.id === latestTxnId)).join('');
     }
 }
 
@@ -344,7 +355,7 @@ function renderDashboardRecent() {
         dashboardList.innerHTML = '';
     } else {
         dashboardEmpty.classList.add('hidden');
-        dashboardList.innerHTML = recent.map(createTransactionCard).join('');
+        dashboardList.innerHTML = recent.map((txn, i) => createTransactionCard(txn, i === 0 && txn.id === latestTxnId)).join('');
     }
 }
 
@@ -493,17 +504,46 @@ function showToast(txn) {
     const container = document.getElementById('toast-container');
     if (!container) return;
 
+    const isReceived = txn.type === 'Received';
     const toast = document.createElement('div');
-    toast.className = `toast ${txn.type === 'Received' ? 'received' : 'sent'}`;
+    toast.className = `toast ${isReceived ? 'received' : 'sent'}`;
 
-    const sign = txn.type === 'Received' ? '+' : '-';
+    const sign = isReceived ? '+' : '-';
     const displayAmount = formatAmount(txn.amount, txn.currency);
-    const name = txn.type === 'Received' ? txn.sender : txn.receiver;
+    const name = isReceived ? (txn.sender || 'Unknown') : (txn.receiver || 'Unknown');
+    const providerName = txn.provider || '';
+    const logoUrl = getProviderLogo(txn.provider);
+    const iconHtml = logoUrl
+        ? `<img src="${logoUrl}" alt="${providerName}" style="width:28px;height:28px;object-fit:contain;">`
+        : `<span style="font-size:20px;">${isReceived ? '📥' : '📤'}</span>`;
 
-    toast.innerHTML = `<div class="toast-body"><div class="toast-title">${name || 'Transaction'}</div><div class="toast-subtitle">${sign}${displayAmount}</div></div>`;
+    toast.innerHTML = `
+        <div class="toast-icon">${iconHtml}</div>
+        <div class="toast-body">
+            <div class="toast-title">${name}</div>
+            <div class="toast-subtitle">
+                <span style="font-size:15px;font-weight:700;color:${isReceived ? 'var(--success)' : 'var(--danger)'}">${sign}${displayAmount}</span>
+                ${providerName ? `<span>${providerName}</span>` : ''}
+            </div>
+        </div>
+        <button onclick="this.parentElement.remove()" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:18px;line-height:1;padding:0 0 0 8px;">✕</button>
+    `;
+
+    // Browser notification if permission granted
+    if (Notification && Notification.permission === 'granted') {
+        new Notification(`${isReceived ? '📥 Received' : '📤 Sent'} — ${providerName}`, {
+            body: `${name}: ${sign}${displayAmount}`,
+            icon: logoUrl || '/logo.png',
+            tag: String(txn.id || Date.now())
+        });
+    }
 
     container.appendChild(toast);
-    setTimeout(() => toast.remove(), 4000);
+    // Slide out animation then remove
+    setTimeout(() => {
+        toast.style.animation = 'toast-out 0.4s ease forwards';
+        setTimeout(() => toast.remove(), 400);
+    }, 5000);
 }
 window.showToast = showToast;
 
@@ -539,6 +579,7 @@ function handleNewTransaction(txn) {
     if (txn.event === 'cleared') {
         allTransactions = [];
         window.allTransactions = allTransactions;
+        latestTxnId = null;
         applyFilters();
         updateMetrics();
         renderSummary();
@@ -550,6 +591,7 @@ function handleNewTransaction(txn) {
 
     allTransactions.unshift(txn);
     window.allTransactions = allTransactions;
+    latestTxnId = txn.id;
     applyFilters();
     updateMetrics();
     renderSummary();
@@ -584,6 +626,45 @@ async function fetchTransactions() {
     }
 }
 
+let pollInterval = null;
+
+async function silentFetchTransactions() {
+    try {
+        const res = await apiFetch('/api/transactions');
+        if (res.ok) {
+            const latestTxns = await res.json();
+            const oldIds = new Set(allTransactions.map(t => t.id));
+            const newTxns = latestTxns.filter(t => !oldIds.has(t.id));
+
+            if (newTxns.length > 0) {
+                allTransactions = latestTxns;
+                window.allTransactions = allTransactions;
+                latestTxnId = newTxns[0].id;
+
+                applyFilters();
+                updateMetrics();
+                renderSummary();
+
+                newTxns.slice(0, 5).forEach(txn => showToast(txn));
+            } else if (latestTxns.length !== allTransactions.length) {
+                allTransactions = latestTxns;
+                window.allTransactions = allTransactions;
+                applyFilters();
+                updateMetrics();
+                renderSummary();
+            }
+        }
+    } catch (e) {
+        // silent catch during polling
+    }
+}
+
+function startPollingFallback() {
+    if (!pollInterval) {
+        pollInterval = setInterval(silentFetchTransactions, 3000);
+    }
+}
+
 function connectWebSocket() {
     if (!accessToken) return;
     const pulse = document.getElementById('connection-pulse');
@@ -592,13 +673,20 @@ function connectWebSocket() {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${window.location.host}/ws?token=${encodeURIComponent(accessToken)}`;
 
-    ws = new WebSocket(wsUrl);
+    try {
+        ws = new WebSocket(wsUrl);
+    } catch (e) {
+        startPollingFallback();
+        return;
+    }
 
     ws.onopen = () => {
         wsRetryCount = 0;
-        pulse.className = 'pulse-indicator connected';
-        connText.textContent = 'Live - Syncing';
-        connText.style.color = 'var(--success)';
+        if (pulse) pulse.className = 'pulse-indicator connected';
+        if (connText) {
+            connText.textContent = 'Live - Connected';
+            connText.style.color = 'var(--success)';
+        }
     };
 
     ws.onmessage = (event) => {
@@ -607,16 +695,22 @@ function connectWebSocket() {
     };
 
     ws.onclose = () => {
-        pulse.className = 'pulse-indicator disconnected';
-        connText.textContent = 'Reconnecting...';
-        connText.style.color = 'var(--danger)';
+        if (pulse) pulse.className = 'pulse-indicator connected';
+        if (connText) {
+            connText.textContent = 'Live (Auto-Sync)';
+            connText.style.color = 'var(--success)';
+        }
+        startPollingFallback();
 
-        const retryDelay = Math.min(1000 * (2 ** wsRetryCount), 30000);
+        const retryDelay = Math.min(2000 * (2 ** wsRetryCount), 30000);
         wsRetryCount += 1;
         setTimeout(connectWebSocket, retryDelay);
     };
 
-    ws.onerror = () => { ws.close(); };
+    ws.onerror = () => {
+        startPollingFallback();
+        if (ws) ws.close();
+    };
 }
 
 function bindDashboardEvents() {
@@ -714,19 +808,53 @@ function bindDashboardEvents() {
     if (modalCloseBtn) modalCloseBtn.addEventListener('click', hideTxnDetails);
     if (modalOverlay) modalOverlay.addEventListener('click', hideTxnDetails);
     window.addEventListener('keydown', (e) => { if (e.key === 'Escape') hideTxnDetails(); });
+
+    // Webhook URL display
+    const webhookUrlDisplay = document.getElementById('webhook-url-display');
+    const copyWebhookBtn = document.getElementById('copy-webhook-btn');
+    if (webhookUrlDisplay && currentCompany) {
+        const baseUrl = `${window.location.protocol}//${window.location.host}`;
+        webhookUrlDisplay.value = `${baseUrl}/api/webhook/sms/${currentCompany.company_code}`;
+    }
+    if (copyWebhookBtn) {
+        copyWebhookBtn.addEventListener('click', () => {
+            if (webhookUrlDisplay && webhookUrlDisplay.value) {
+                navigator.clipboard.writeText(webhookUrlDisplay.value).then(() => {
+                    const orig = copyWebhookBtn.textContent;
+                    copyWebhookBtn.textContent = 'Copied!';
+                    setTimeout(() => { copyWebhookBtn.textContent = orig; }, 1800);
+                }).catch(() => {
+                    webhookUrlDisplay.select();
+                    document.execCommand('copy');
+                });
+            }
+        });
+    }
 }
 
 function initDashboard() {
-    if (dashboardInitialized) return;
-    dashboardInitialized = true;
-
-    setInterval(updateClock, 1000);
     updateClock();
 
-    bindDashboardEvents();
+    if (!dashboardInitialized) {
+        dashboardInitialized = true;
+        setInterval(updateClock, 1000);
+        bindDashboardEvents();
+    }
+
+    const webhookUrlDisplay = document.getElementById('webhook-url-display');
+    if (webhookUrlDisplay && currentCompany) {
+        const baseUrl = `${window.location.protocol}//${window.location.host}`;
+        webhookUrlDisplay.value = `${baseUrl}/api/webhook/sms/${currentCompany.company_code}`;
+    }
+
     fetchTransactions();
     connectWebSocket();
+    startPollingFallback();
     renderReport();
+
+    if (window.Notification && Notification.permission === 'default') {
+        Notification.requestPermission();
+    }
 
     window.dispatchEvent(new Event('cashin-dashboard-ready'));
 }
