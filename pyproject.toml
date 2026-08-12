@@ -12,7 +12,7 @@ dependencies = [
     "uvicorn[standard]==0.30.0",
     "pydantic==2.13.4",
     "python-multipart==0.0.6",
-    "websockets==12.0",
+    "websockets>=12.0",
     "telethon==1.44.0",
     "openpyxl==3.1.5"
 ]
