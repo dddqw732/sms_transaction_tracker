@@ -76,7 +76,7 @@ def collect_files(base_dir, skip_dirs=None, skip_extensions=None, max_size_mb=10
     """Walk the directory and collect all relevant files."""
     skip_dirs = skip_dirs or {".git", "build", ".gradle", ".kotlin", "__pycache__", ".idea", "transactions.db"}
     skip_extensions = skip_extensions or {".apk", ".class", ".dex", ".iml", ".webp", ".zip", ".session", ".session-journal"}
-    SKIP_FILES = {".env.telethon", "telethon.session", "telethon.session-journal", "transactions.db"}
+    SKIP_FILES = {".env", ".env.telethon", "telethon.session", "telethon.session-journal", "transactions.db", "transactions.db-shm", "transactions.db-wal"}
     
     files = {}
     for root, dirs, filenames in os.walk(base_dir):
