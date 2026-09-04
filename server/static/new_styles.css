@@ -1,0 +1,1162 @@
+/* ═════════════════════════════════════════════════════════════════════════════ */
+/* NEW FEATURES: Business-Specific Adaptive UI, FX Sliders, Charts & Print CSS   */
+/* ═════════════════════════════════════════════════════════════════════════════ */
+
+/* ─── Business Type Selection Cards (Registration) ─────────────────────────── */
+.business-type-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-top: 6px;
+  margin-bottom: 16px;
+}
+
+.business-type-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 12px 14px;
+  background: var(--surface, #ffffff);
+  border: 1.5px solid var(--border, #e2e8f0);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.business-type-card input[type="radio"] {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.business-type-card:hover {
+  border-color: #6366f1;
+  background: rgba(99, 102, 241, 0.04);
+}
+
+.business-type-card.active {
+  border-color: #6366f1;
+  background: rgba(99, 102, 241, 0.08);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+}
+
+.bt-icon {
+  font-size: 22px;
+  margin-bottom: 4px;
+}
+
+.bt-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.bt-sub {
+  font-size: 11px;
+  color: #64748b;
+  margin-top: 2px;
+}
+
+/* ─── Business Badges ───────────────────────────────────────────────────────── */
+.business-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 700;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.12), rgba(168, 85, 247, 0.12));
+  color: #6366f1;
+  border: 1px solid rgba(99, 102, 241, 0.25);
+  margin-left: 12px;
+  text-transform: capitalize;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+}
+
+/* ─── Multi-Currency Balances Bar ─────────────────────────────────────────── */
+.currency-balances-bar {
+  display: flex;
+  gap: 14px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.currency-pill-card {
+  flex: 1;
+  min-width: 140px;
+  background: var(--surface, #ffffff);
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 12px;
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+}
+
+.cpc-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #64748b;
+  margin-bottom: 4px;
+}
+
+.cpc-value {
+  font-size: 18px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+/* ─── Modal Sizing ─────────────────────────────────────────────────────────── */
+.modal-lg {
+  max-width: 650px !important;
+  width: 95% !important;
+}
+
+.classify-head-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.classify-badge {
+  display: inline-block;
+  align-self: flex-start;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 6px;
+  background: #f1f5f9;
+  color: #334155;
+  margin-bottom: 4px;
+}
+
+/* ─── Zero-Friction Classification Flows ───────────────────────────────────── */
+.quick-preset-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.preset-btn {
+  flex: 1;
+  min-width: 100px;
+  padding: 10px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 10px;
+  border: 1.5px solid #e2e8f0;
+  background: #ffffff;
+  color: #334155;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.preset-btn:hover, .preset-btn.active {
+  border-color: #6366f1;
+  background: #6366f1;
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.25);
+}
+
+/* Menu Item Select Cards */
+.menu-items-section-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #475569;
+  margin-bottom: 8px;
+  display: flex;
+  justify-content: space-between;
+}
+
+.menu-items-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(135px, 1fr));
+  gap: 8px;
+  max-height: 220px;
+  overflow-y: auto;
+  padding-right: 4px;
+  margin-bottom: 16px;
+}
+
+.menu-item-card {
+  padding: 10px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.menu-item-card:hover {
+  border-color: #6366f1;
+  background: #ffffff;
+}
+
+.menu-item-card.selected {
+  border-color: #10b981;
+  background: rgba(16, 185, 129, 0.08);
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+}
+
+.mic-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.mic-bottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 6px;
+}
+
+.mic-price {
+  font-size: 13px;
+  font-weight: 800;
+  color: #10b981;
+}
+
+.mic-qty {
+  font-size: 11px;
+  font-weight: 700;
+  background: #10b981;
+  color: #ffffff;
+  padding: 1px 6px;
+  border-radius: 10px;
+}
+
+/* ─── Currency Exchange Split Flow with Fluid Sliders ──────────────────────── */
+.split-exchange-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.split-card {
+  background: #f8fafc;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 14px;
+  position: relative;
+}
+
+.split-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.target-currency-pills {
+  display: flex;
+  gap: 6px;
+}
+
+.target-curr-btn {
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 6px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  cursor: pointer;
+}
+
+.target-curr-btn.active {
+  background: #6366f1;
+  color: #ffffff;
+  border-color: #6366f1;
+}
+
+/* Slider Controls */
+.slider-control-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.slider-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.allocation-slider {
+  flex: 1;
+  height: 8px;
+  border-radius: 5px;
+  background: #e2e8f0;
+  outline: none;
+  cursor: pointer;
+  accent-color: #6366f1;
+}
+
+.slider-val-badge {
+  font-size: 14px;
+  font-weight: 800;
+  color: #1e293b;
+  min-width: 90px;
+  text-align: right;
+}
+
+.slider-chips-row {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.chip-btn {
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 6px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #475569;
+  cursor: pointer;
+}
+
+.chip-btn:hover {
+  background: #6366f1;
+  color: #ffffff;
+  border-color: #6366f1;
+}
+
+/* Delivery Method Selector */
+.delivery-methods-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.delivery-btn {
+  flex: 1;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 6px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #334155;
+  cursor: pointer;
+  text-align: center;
+}
+
+.delivery-btn.active {
+  background: #10b981;
+  color: #ffffff;
+  border-color: #10b981;
+}
+
+.remaining-alloc-indicator {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  background: #f1f5f9;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  margin-top: 8px;
+}
+
+.remaining-alloc-indicator.complete {
+  background: rgba(16, 185, 129, 0.12);
+  color: #059669;
+}
+
+.remaining-alloc-indicator.remaining {
+  background: rgba(245, 158, 11, 0.12);
+  color: #d97706;
+}
+
+/* ─── Analytics Reports & Print View ───────────────────────────────────────── */
+.report-header-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.report-time-pills {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.time-pill {
+  padding: 7px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 20px;
+  border: 1px solid var(--border, #e2e8f0);
+  background: var(--surface, #ffffff);
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.time-pill:hover, .time-pill.active {
+  background: #6366f1;
+  color: #ffffff;
+  border-color: #6366f1;
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.25);
+}
+
+.report-action-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.custom-date-bar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 16px;
+  background: var(--surface, #ffffff);
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 12px;
+  margin-bottom: 16px;
+}
+
+.analytics-charts-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr;
+  gap: 16px;
+  margin-top: 20px;
+  margin-bottom: 24px;
+}
+
+@media (max-width: 1024px) {
+  .analytics-charts-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.chart-card {
+  background: var(--surface, #ffffff);
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 14px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+}
+
+.chart-card-header h4 {
+  font-size: 14px;
+  font-weight: 700;
+  color: #334155;
+  margin-bottom: 12px;
+}
+
+.chart-canvas-wrap {
+  position: relative;
+  width: 100%;
+}
+
+/* ─── Dashboard Provider Balances Grid ─────────────────────────────────────── */
+.provider-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.provider-balance-card {
+  background: var(--surface, #ffffff);
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 12px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.provider-balance-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+
+.pbc-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.pbc-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.pbc-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.pbc-net {
+  font-size: 18px;
+  font-weight: 800;
+  margin: 2px 0 6px 0;
+}
+
+.pbc-flows {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #64748b;
+  border-top: 1px solid #f1f5f9;
+  padding-top: 6px;
+  margin-top: 2px;
+}
+
+.provider-balance-card.total-card {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.06), rgba(16, 185, 129, 0.05));
+  border: 1.5px solid rgba(99, 102, 241, 0.25);
+}
+
+/* ─── Printable Financial Statement Component Styles ───────────────────────── */
+.printable-statement-card {
+  background: var(--surface, #ffffff);
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 14px;
+  padding: 24px;
+  margin-top: 20px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+}
+
+.statement-letterhead {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  border-bottom: 2.5px solid #0f172a;
+  padding-bottom: 16px;
+  margin-bottom: 20px;
+}
+
+.stmt-meta-badge {
+  display: inline-block;
+  background: #0f172a;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  padding: 3px 8px;
+  border-radius: 4px;
+}
+
+.statement-kpi-summary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  margin-bottom: 22px;
+  overflow: hidden;
+}
+
+.stmt-kpi-box {
+  padding: 12px 16px;
+  border-right: 1px solid #e2e8f0;
+  display: flex;
+  flex-direction: column;
+}
+
+.stmt-kpi-label {
+  font-size: 10px;
+  font-weight: 800;
+  color: #64748b;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+
+.stmt-kpi-val {
+  font-size: 18px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.statement-section-heading {
+  margin: 20px 0 10px 0;
+}
+
+.statement-section-heading h4 {
+  font-size: 13px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #334155;
+  margin: 0;
+  border-left: 3px solid #6366f1;
+  padding-left: 8px;
+}
+
+.statement-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.statement-table th {
+  background: #f8fafc;
+  padding: 9px 12px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 700;
+  color: #475569;
+  border-bottom: 1.5px solid #cbd5e1;
+  text-transform: uppercase;
+}
+
+.statement-table td {
+  padding: 10px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #1e293b;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.statement-table tfoot td {
+  font-weight: 800;
+  border-top: 2px solid #cbd5e1;
+  background: #f8fafc;
+}
+
+.statement-signoff-block {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-top: 40px;
+  padding-top: 20px;
+  border-top: 1px dashed #cbd5e1;
+  gap: 20px;
+}
+
+.signoff-column {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.signoff-line {
+  height: 1.5px;
+  background: #0f172a;
+  width: 80%;
+  margin-bottom: 8px;
+}
+
+.signoff-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #334155;
+}
+
+.signoff-date {
+  font-size: 10px;
+  color: #64748b;
+  margin-top: 2px;
+}
+
+.signoff-seal-box {
+  width: 120px;
+  height: 70px;
+  border: 1.5px dashed #94a3b8;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-size: 9px;
+  font-weight: 800;
+  color: #94a3b8;
+  letter-spacing: 0.5px;
+}
+
+/* ─── Invoices Card & Listing ──────────────────────────────────────────────── */
+.invoices-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.invoice-card {
+  background: var(--surface, #ffffff);
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+  transition: all 0.15s ease;
+}
+
+.invoice-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+
+.inv-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 8px;
+}
+
+.inv-number {
+  font-size: 13px;
+  font-weight: 800;
+  color: #1e293b;
+}
+
+.inv-status {
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.inv-status.pending {
+  background: rgba(245, 158, 11, 0.12);
+  color: #d97706;
+}
+
+.inv-status.paid {
+  background: rgba(16, 185, 129, 0.12);
+  color: #059669;
+}
+
+.inv-amount {
+  font-size: 18px;
+  font-weight: 800;
+  color: #0f172a;
+  margin: 4px 0;
+}
+
+.inv-customer {
+  font-size: 12px;
+  color: #64748b;
+  margin-bottom: 8px;
+}
+
+.inv-desc {
+  font-size: 12px;
+  color: #334155;
+  background: #f8fafc;
+  padding: 6px 10px;
+  border-radius: 6px;
+  margin-bottom: 12px;
+}
+
+.inv-actions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+  border-top: 1px solid #f1f5f9;
+  padding-top: 10px;
+}
+
+/* Printable Invoice Receipt View */
+.printable-invoice-card {
+  background: #ffffff;
+  padding: 24px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  color: #0f172a;
+  font-family: 'Outfit', sans-serif;
+}
+
+/* ─── Menu / Catalog Manager ───────────────────────────────────────────────── */
+.catalog-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.catalog-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 14px;
+}
+
+.catalog-item-card {
+  background: var(--surface, #ffffff);
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.cic-info h4 {
+  font-size: 14px;
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+
+.cic-category {
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.cic-price {
+  font-size: 15px;
+  font-weight: 800;
+  color: #10b981;
+}
+
+.exchange-rate-card {
+  background: var(--surface, #ffffff);
+  border: 1.5px solid var(--border, #e2e8f0);
+  border-radius: 14px;
+  padding: 18px;
+}
+
+/* ═════════════════════════════════════════════════════════════════════════════ */
+/* ─── BULLETPROOF PRINT STYLES (@media print) ──────────────────────────────── */
+/* ═════════════════════════════════════════════════════════════════════════════ */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 12mm 15mm;
+  }
+
+  *, *:before, *:after {
+    background: transparent !important;
+    color: #000000 !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  html, body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    font-size: 10.5pt !important;
+    line-height: 1.4 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Hide entire dashboard shell & web elements */
+  .sidebar, .top-header, .report-header-banner, .custom-date-bar,
+  .analytics-charts-grid, .summary-metrics-grid, .metrics-grid,
+  .currency-balances-bar, .dashboard-provider-section, .recent-transactions,
+  .ledger-controls-row, .type-filter-group, .invoices-controls,
+  .catalog-header-row, .settings-grid, .toast-container,
+  #notification-popup, .modal-overlay, .modal-header,
+  .close-btn, button, .btn, .icon-btn, .nav-menu {
+    display: none !important;
+  }
+
+  .app-container, .main-content {
+    display: block !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    min-width: 100% !important;
+  }
+
+  /* When printing financial statement */
+  body:not(.printing-invoice-mode) .tab-content {
+    display: none !important;
+  }
+
+  body:not(.printing-invoice-mode) #tab-summary {
+    display: block !important;
+  }
+
+  body:not(.printing-invoice-mode) #printable-statement-section {
+    display: block !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+  }
+
+  /* When printing single invoice */
+  body.printing-invoice-mode #dashboard-app,
+  body.printing-invoice-mode #tab-summary,
+  body.printing-invoice-mode #tab-invoices {
+    display: none !important;
+  }
+
+  body.printing-invoice-mode #invoice-print-modal {
+    display: block !important;
+    position: static !important;
+    background: transparent !important;
+  }
+
+  body.printing-invoice-mode #invoice-print-modal .modal-container {
+    width: 100% !important;
+    max-width: 100% !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+  }
+
+  /* Clean Financial Statement Print Formatting */
+  .statement-letterhead {
+    border-bottom: 2pt solid #000000 !important;
+    margin-bottom: 12pt !important;
+    padding-bottom: 8pt !important;
+  }
+
+  .statement-letterhead h2 {
+    font-size: 18pt !important;
+    font-weight: bold !important;
+    color: #000000 !important;
+  }
+
+  .stmt-meta-badge {
+    border: 1pt solid #000000 !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    font-size: 9pt !important;
+  }
+
+  .statement-kpi-summary {
+    border: 1pt solid #000000 !important;
+    background: #f8f8f8 !important;
+    margin-bottom: 14pt !important;
+  }
+
+  .stmt-kpi-box {
+    border-right: 1pt solid #000000 !important;
+    padding: 6pt 10pt !important;
+  }
+
+  .statement-section-heading h4 {
+    border-left: 3pt solid #000000 !important;
+    font-size: 10.5pt !important;
+    font-weight: bold !important;
+    margin: 12pt 0 6pt 0 !important;
+  }
+
+  .statement-table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    margin-bottom: 12pt !important;
+  }
+
+  .statement-table th {
+    background: #eeeeee !important;
+    color: #000000 !important;
+    border-top: 1pt solid #000000 !important;
+    border-bottom: 1.5pt solid #000000 !important;
+    padding: 5pt 6pt !important;
+    font-size: 9pt !important;
+  }
+
+  .statement-table td {
+    border-bottom: 0.5pt solid #dddddd !important;
+    padding: 5pt 6pt !important;
+    font-size: 9pt !important;
+  }
+
+  .statement-table tfoot tr {
+    background: #f0f0f0 !important;
+    border-top: 1.5pt solid #000000 !important;
+  }
+
+  .statement-signoff-block {
+    margin-top: 25pt !important;
+    border-top: 1pt solid #000000 !important;
+    page-break-inside: avoid !important;
+  }
+
+  .signoff-line {
+    border-bottom: 1pt solid #000000 !important;
+    background: transparent !important;
+  }
+
+  .signoff-seal-box {
+    border: 1pt dashed #000000 !important;
+  }
+}
+
+/* ─── Collapsible Provider Wallets Section ─────────────────────────────────── */
+.provider-section-collapsible {
+  background: var(--surface, #ffffff);
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 14px;
+  padding: 16px 20px;
+  margin-bottom: 24px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+  transition: all 0.2s ease;
+}
+
+.provider-toggle-header {
+  user-select: none;
+  transition: opacity 0.15s ease;
+}
+
+.provider-toggle-header:hover {
+  opacity: 0.85;
+}
+
+.provider-cards-collapsible {
+  max-height: 800px;
+  opacity: 1;
+  overflow: hidden;
+  transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease, margin-top 0.3s ease;
+}
+
+.provider-cards-collapsible.collapsed {
+  max-height: 0;
+  opacity: 0;
+  margin-top: 0 !important;
+  pointer-events: none;
+}
+
+/* ─── Quick Filter Presets Bar ─────────────────────────────────────────────── */
+.quick-filter-presets {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.preset-chip {
+  background: var(--surface, #ffffff);
+  border: 1px solid var(--border, #cbd5e1);
+  color: var(--text-muted, #64748b);
+  border-radius: 20px;
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.preset-chip:hover {
+  border-color: var(--primary, #6366f1);
+  color: var(--primary, #6366f1);
+  background: rgba(99, 102, 241, 0.04);
+}
+
+.preset-chip.active {
+  background: var(--primary, #6366f1);
+  color: #ffffff;
+  border-color: var(--primary, #6366f1);
+  box-shadow: 0 2px 6px rgba(99, 102, 241, 0.25);
+}
+
+/* ─── FX Quick Calculator Widget Card ──────────────────────────────────────── */
+.fx-quick-calculator-card {
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 14px;
+  padding: 16px 20px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+  transition: all 0.2s ease;
+}
+
+.fx-quick-calculator-card:hover {
+  border-color: rgba(99, 102, 241, 0.4);
+  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.08);
+}
+
+.fx-calc-body {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.fx-input-group {
+  flex: 1;
+  min-width: 140px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.fx-input-group label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted, #64748b);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.fx-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.fx-input-wrap input {
+  width: 100%;
+  padding: 8px 36px 8px 12px;
+  border: 1.5px solid var(--border, #cbd5e1);
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text, #0f172a);
+  background: var(--surface, #ffffff);
+  transition: border-color 0.15s ease;
+}
+
+.fx-input-wrap input:focus {
+  outline: none;
+  border-color: var(--primary, #6366f1);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+}
+
+.fx-unit {
+  position: absolute;
+  right: 12px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted, #94a3b8);
+  pointer-events: none;
+}
+
+.fx-calc-arrow {
+  color: var(--primary, #6366f1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 18px;
+}
+
+

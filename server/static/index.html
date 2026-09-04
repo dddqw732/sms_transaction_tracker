@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cash-In - Smart Business Financial Tracker & Analytics</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css?v=9">
+    <link rel="stylesheet" href="new_styles.css?v=2">
+</head>
+<body class="light-theme">
+    <!-- ─── LANDING VIEW ────────────────────────────────────────────────── -->
+    <section id="landing-view" class="auth-shell landing-shell">
+        <div class="landing-overlay"></div>
+        <div class="landing-content">
+            <div class="landing-brand">Cash-In</div>
+            <h1>Track Every Transaction. <span>Tailored to Your Business.</span></h1>
+            <p class="landing-text">
+                Zero-friction financial tracking for Restaurants, Currency Exchanges, Retail Stores, and Pharmacies.
+                Classify payment notifications in 2 taps, manage multi-currency exchange splits, and generate accountant-ready printable statements.
+            </p>
+            <div class="landing-actions">
+                <button id="go-login-btn" class="btn btn-primary">Log In</button>
+                <button id="go-signup-btn" class="btn btn-secondary">Create Company</button>
+            </div>
+            <div class="landing-pillars">
+                <div class="landing-pillar">
+                    <h3>⚡ 2-Tap Classification</h3>
+                    <p>Classify incoming SMS without manual typing using smart presets & sliders.</p>
+                </div>
+                <div class="landing-pillar">
+                    <h3>💱 Multi-Currency Split FX</h3>
+                    <p>Fluid allocation sliders, live exchange rates, and multi-wallet delivery tracking.</p>
+                </div>
+                <div class="landing-pillar">
+                    <h3>📊 Printable Statements</h3>
+                    <p>Daily, weekly, and monthly reports formatted for paper printing and PDF export.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ─── AUTH VIEW ───────────────────────────────────────────────────── -->
+    <section id="auth-view" class="auth-shell hidden">
+        <div class="auth-card-wrap">
+            <div class="auth-brand-block">
+                <div class="auth-logo">CI</div>
+                <div>
+                    <h2>Cash-In Portal</h2>
+                    <p>Log in or register your business workspace.</p>
+                </div>
+            </div>
+
+            <div class="auth-tab-row">
+                <button id="tab-login-btn" class="auth-tab active">Login</button>
+                <button id="tab-signup-btn" class="auth-tab">Sign Up</button>
+            </div>
+
+            <div id="auth-message" class="auth-message hidden"></div>
+
+            <form id="login-form" class="auth-form">
+                <label>Company Code</label>
+                <input id="login-company-code" type="text" class="custom-input" placeholder="e.g. RES001" required>
+
+                <label>Password</label>
+                <input id="login-password" type="password" class="custom-input" placeholder="Enter password" required>
+
+                <button type="submit" class="btn btn-primary btn-full">Login to Dashboard</button>
+                <button id="back-to-landing-login" type="button" class="btn btn-text btn-full">Back to Landing</button>
+            </form>
+
+            <form id="signup-form" class="auth-form hidden">
+                <label>Company Name</label>
+                <input id="signup-company-name" type="text" class="custom-input" placeholder="e.g. Al-Baraka Restaurant" required>
+
+                <label>Business Type</label>
+                <div class="business-type-grid" id="business-type-selector">
+                    <label class="business-type-card active" for="bt-restaurant">
+                        <input type="radio" id="bt-restaurant" name="signup-business-type" value="restaurant" checked>
+                        <span class="bt-title">Restaurant</span>
+                        <span class="bt-sub">Menu items & orders</span>
+                    </label>
+                    <label class="business-type-card" for="bt-exchange">
+                        <input type="radio" id="bt-exchange" name="signup-business-type" value="money_exchange">
+                        <span class="bt-title">Exchange</span>
+                        <span class="bt-sub">Split FX & Transfers</span>
+                    </label>
+                    <label class="business-type-card" for="bt-retail">
+                        <input type="radio" id="bt-retail" name="signup-business-type" value="retail">
+                        <span class="bt-title">Retail Store</span>
+                        <span class="bt-sub">Products & Sales</span>
+                    </label>
+                    <label class="business-type-card" for="bt-pharmacy">
+                        <input type="radio" id="bt-pharmacy" name="signup-business-type" value="pharmacy">
+                        <span class="bt-title">Pharmacy</span>
+                        <span class="bt-sub">Medicines & Health</span>
+                    </label>
+                </div>
+
+                <label>City</label>
+                <input id="signup-city" type="text" class="custom-input" placeholder="Hargeisa" required>
+
+                <label>Initial Subscription Plan</label>
+                <select id="signup-plan" class="custom-select" required>
+                    <option value="Starter">Starter</option>
+                    <option value="Growth">Growth</option>
+                    <option value="Enterprise">Enterprise</option>
+                </select>
+
+                <label>Password</label>
+                <input id="signup-password" type="password" class="custom-input" minlength="6" required>
+
+                <button type="submit" class="btn btn-primary btn-full" style="margin-top: 10px;">Create Business Account</button>
+                <button id="back-to-landing-signup" type="button" class="btn btn-text btn-full">Back to Landing</button>
+            </form>
+
+            <div id="signup-success" class="signup-success hidden">
+                <h3>Company Created Successfully</h3>
+                <p>Your unique Company Code is:</p>
+                <div id="generated-company-code" class="generated-code">---</div>
+                <p class="text-muted">Save this code. You will use it with your password to log in.</p>
+                <button id="signup-to-login-btn" class="btn btn-primary btn-full" style="margin-top: 12px;">Proceed to Login</button>
+            </div>
+        </div>
+    </section>
+
+    <!-- ─── DASHBOARD VIEW ──────────────────────────────────────────────── -->
+    <div id="dashboard-app" class="app-container hidden">
+        <aside class="sidebar">
+            <div class="brand">
+                <div class="logo-icon">
+                    <img src="logo.png" alt="Cash-In Logo" style="width: 32px; height: 32px; object-fit: contain;">
+                </div>
+                <div class="brand-text">
+                    <h1>Cash-In</h1>
+                    <span id="sidebar-business-tag">Smart Business Ledger</span>
+                </div>
+            </div>
+
+            <div class="status-card">
+                <div class="pulse-indicator disconnected" id="connection-pulse"></div>
+                <span class="status-label" id="connection-text">Connecting...</span>
+            </div>
+
+            <nav class="nav-menu">
+                <button class="nav-btn active" data-target="tab-dashboard" data-title="Dashboard">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+                    <span>Dashboard</span>
+                </button>
+                <button class="nav-btn" data-target="tab-ledger" data-title="Ledger">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                    <span>Transactions</span>
+                </button>
+                <button class="nav-btn" data-target="tab-summary" data-title="Reports">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+                    <span>Reports & Analytics</span>
+                </button>
+                <button class="nav-btn" data-target="tab-invoices" data-title="Invoices">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z"/><path d="M4 9h16"/><path d="M9 20V9"/></svg>
+                    <span>Invoices</span>
+                </button>
+                <button class="nav-btn" data-target="tab-catalog" data-title="Catalog" id="nav-catalog-btn">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+                    <span>Menu & Products</span>
+                </button>
+                <button class="nav-btn" data-target="tab-settings" data-title="Settings">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                    <span>Settings</span>
+                </button>
+            </nav>
+        </aside>
+
+        <main class="main-content">
+            <header class="top-header">
+                <div class="header-left">
+                    <h2 id="page-title">Dashboard</h2>
+                    <span id="header-business-badge" class="business-badge">Restaurant</span>
+                </div>
+                <div class="header-actions">
+                    <div class="current-time" id="live-time">June 24, 2026</div>
+                    <div id="company-chip" class="company-chip">---</div>
+                    <button id="logout-btn" class="btn btn-text">Logout</button>
+                </div>
+            </header>
+
+            <!-- TAB 1: DASHBOARD -->
+            <section id="tab-dashboard" class="tab-content active">
+                <section class="metrics-grid">
+                    <div class="metric-card">
+                        <div class="metric-info">
+                            <h3>Total Transactions</h3>
+                            <p class="metric-value" id="stat-total-count">0</p>
+                        </div>
+                    </div>
+                    <div class="metric-card clickable" onclick="document.querySelector('[data-target=\'tab-summary\']').click()" style="cursor: pointer;">
+                        <div class="metric-info">
+                            <h3>Total Inflow (Received)</h3>
+                            <p class="metric-value text-success" id="stat-total-received">0.00</p>
+                        </div>
+                    </div>
+                    <div class="metric-card clickable" onclick="document.querySelector('[data-target=\'tab-summary\']').click()" style="cursor: pointer;">
+                        <div class="metric-info">
+                            <h3>Total Outflow (Sent)</h3>
+                            <p class="metric-value text-danger" id="stat-total-sent">0.00</p>
+                        </div>
+                    </div>
+                    <div class="metric-card clickable" onclick="document.querySelector('[data-target=\'tab-summary\']').click()" style="cursor: pointer;">
+                        <div class="metric-info">
+                            <h3>Net Movement</h3>
+                            <p class="metric-value text-success" id="stat-net-balance">+ 0.00</p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Multi-Currency Balances Bar -->
+                <div class="currency-balances-bar" id="currency-balances-bar">
+                    <!-- Populated dynamically (USD, SLSH, ETB) -->
+                </div>
+
+                <!-- Provider Balances Breakdown (Collapsible Accordion / Dropdown) -->
+                <div class="dashboard-provider-section" id="provider-section-wrapper" style="margin-bottom: 24px;">
+                    <div class="provider-section-header" id="provider-toggle-header" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;cursor:pointer;user-select:none;padding:10px 14px;border-radius:12px;background:rgba(241,245,249,0.85);border:1px solid rgba(226,232,240,0.8);transition:all 0.2s ease;">
+                        <h3 style="font-size:14px;font-weight:700;color:#1e293b;margin:0;display:flex;align-items:center;gap:10px;">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M7 15h0M2 9.5h20"/></svg>
+                            <span>Provider Wallets & Balances</span>
+                            <span class="provider-count-badge" id="provider-count-badge" style="font-size:11px;font-weight:700;background:#e0e7ff;color:#4338ca;padding:2px 8px;border-radius:12px;">4 Wallets</span>
+                        </h3>
+                        <div style="display:flex;align-items:center;gap:8px;">
+                            <span id="provider-toggle-hint" style="font-size:12px;font-weight:600;color:#64748b;">Click to collapse</span>
+                            <div class="toggle-chevron" id="provider-toggle-chevron" style="width:24px;height:24px;border-radius:50%;background:#ffffff;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 3px rgba(0,0,0,0.08);transition:transform 0.3s cubic-bezier(0.16,1,0.3,1);">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="provider-cards-collapsible" id="provider-cards-collapsible">
+                        <div class="provider-cards-grid" id="dashboard-provider-cards">
+                            <!-- Populated dynamically with individual provider cards + Total card -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Live FX Currency Calculator Widget -->
+                <div class="fx-quick-calculator-card" id="dashboard-fx-widget" style="margin-bottom:24px;background:#ffffff;border:1px solid #e2e8f0;border-radius:14px;padding:16px 20px;box-shadow:0 2px 6px rgba(0,0,0,0.02);">
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+                        <div style="display:flex;align-items:center;gap:8px;font-size:14px;font-weight:700;color:#0f172a;">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 18V6"/></svg>
+                            <span>Live Currency Conversion Calculator</span>
+                        </div>
+                        <span class="fx-calc-rate-badge" id="fx-widget-rate-badge" style="font-size:12px;font-weight:700;background:#f8fafc;border:1px solid #cbd5e1;padding:3px 10px;border-radius:20px;color:#334155;">1 USD = 11,000 SLSH</span>
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:12px;align-items:center;">
+                        <div>
+                            <label style="font-size:12px;font-weight:600;color:#64748b;display:block;margin-bottom:4px;">USD Amount ($)</label>
+                            <input type="number" id="fx-calc-usd" class="custom-input" placeholder="100.00" value="100" step="any">
+                        </div>
+                        <div style="padding-top:18px;color:#94a3b8;display:flex;justify-content:center;">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M7 10l5-5 5 5"/><path d="M17 14l-5 5-5-5"/></svg>
+                        </div>
+                        <div>
+                            <label style="font-size:12px;font-weight:600;color:#64748b;display:block;margin-bottom:4px;">SLSH Equivalent (Somaliland Shilling)</label>
+                            <input type="text" id="fx-calc-slsh" class="custom-input" readonly value="1,100,000 SLSH" style="font-weight:700;color:#0f172a;background:#f8fafc;">
+                        </div>
+                    </div>
+                </div>
+
+                <section class="recent-transactions">
+                    <div class="section-header">
+                        <h3>Live Transactions Stream</h3>
+                        <button class="btn btn-text" onclick="document.querySelector('[data-target=\'tab-ledger\']').click()">View Complete Ledger</button>
+                    </div>
+                    <div class="ledger-container">
+                        <div class="empty-state hidden" id="dashboard-empty"><p>No transactions recorded yet.</p></div>
+                        <div class="ledger-list" id="dashboard-recent-list"></div>
+                    </div>
+                </section>
+            </section>
+
+            <!-- TAB 2: LEDGER (TRANSACTIONS) -->
+            <section id="tab-ledger" class="tab-content">
+                <!-- Quick Filter Presets Bar -->
+                <div class="quick-filter-presets-bar" id="quick-filter-presets" style="display:flex;gap:8px;margin-bottom:14px;overflow-x:auto;padding-bottom:4px;">
+                    <button class="preset-chip active" data-preset="all">All Transactions</button>
+                    <button class="preset-chip" data-preset="today">Today</button>
+                    <button class="preset-chip" data-preset="inflow">Money In (+)</button>
+                    <button class="preset-chip" data-preset="outflow">Money Out (-)</button>
+                    <button class="preset-chip" data-preset="unclassified">Unclassified</button>
+                    <button class="preset-chip" data-preset="large">High Value (≥$100)</button>
+                </div>
+
+                <div class="controls-bar">
+                    <div class="search-wrap">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                        <input type="text" id="search-input" placeholder="Search by party name, ID, category..." class="search-input">
+                    </div>
+                    <div class="filters-wrap">
+                        <select id="provider-filter" class="custom-select">
+                            <option value="">All Providers</option>
+                            <option value="ZAAD">ZAAD</option>
+                            <option value="eDahab">eDahab</option>
+                            <option value="EVC Plus">EVC Plus</option>
+                            <option value="Sahal">Sahal</option>
+                        </select>
+                        <select id="category-filter" class="custom-select">
+                            <option value="">All Categories</option>
+                            <option value="Orders">Orders</option>
+                            <option value="Drinks">Drinks</option>
+                            <option value="Currency Exchange">Currency Exchange</option>
+                            <option value="Product Sale">Product Sale</option>
+                            <option value="Prescription Sale">Prescription Sale</option>
+                            <option value="Customer Payment">Customer Payment</option>
+                            <option value="Unclassified">Unclassified</option>
+                        </select>
+                        <select id="sort-by" class="custom-select">
+                            <option value="timestamp">Date & Time</option>
+                            <option value="amount">Amount</option>
+                            <option value="provider">Provider</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="type-filter-group">
+                    <button class="filter-btn active" data-type="">All Types</button>
+                    <button class="filter-btn" data-type="Received"><span class="dot received"></span>Received (In)</button>
+                    <button class="filter-btn" data-type="Sent"><span class="dot sent"></span>Sent (Out)</button>
+                    <button class="btn btn-secondary" id="seed-demo-btn" style="margin-left:auto;background:rgba(99,102,241,0.08);color:#6366f1;border:1px solid rgba(99,102,241,0.25);">Seed Demo Data</button>
+                    <button class="btn btn-secondary" id="open-new-txn-btn">+ Add Transaction</button>
+                </div>
+                <div class="ledger-container" id="ledger-container">
+                    <div class="empty-state" id="ledger-loader"><div class="spinner"></div><p>Loading transactions...</p></div>
+                    <div class="empty-state hidden" id="ledger-empty"><p>No transactions found matching the filters.</p></div>
+                    <div class="ledger-list hidden" id="ledger-list"></div>
+                </div>
+            </section>
+
+            <!-- TAB 3: REPORTS & ANALYTICS -->
+            <section id="tab-summary" class="tab-content">
+                <div class="report-header-banner">
+                    <div class="report-time-pills" id="report-time-pills">
+                        <button class="time-pill active" data-range="today">Today</button>
+                        <button class="time-pill" data-range="yesterday">Yesterday</button>
+                        <button class="time-pill" data-range="this_week">This Week</button>
+                        <button class="time-pill" data-range="last_week">Last Week</button>
+                        <button class="time-pill" data-range="this_month">This Month</button>
+                        <button class="time-pill" data-range="last_month">Last Month</button>
+                        <button class="time-pill" data-range="custom">Custom Date</button>
+                    </div>
+                    <div class="report-action-buttons">
+                        <button id="print-statement-btn" class="btn btn-primary">Print Financial Statement</button>
+                        <button id="export-excel-btn" class="btn btn-secondary">Export Excel</button>
+                    </div>
+                </div>
+
+                <div id="custom-date-bar" class="custom-date-bar hidden">
+                    <label>From: <input type="date" id="rep-start-date" class="custom-input"></label>
+                    <label>To: <input type="date" id="rep-end-date" class="custom-input"></label>
+                    <button id="apply-custom-date-btn" class="btn btn-secondary">Apply Filter</button>
+                </div>
+
+                <!-- Report KPI Cards -->
+                <div class="summary-metrics-grid">
+                    <div class="metric-card report-metric">
+                        <div class="metric-info">
+                            <h3>Period Inflow (Received)</h3>
+                            <p class="metric-value text-success" id="report-total-received">0.00</p>
+                        </div>
+                    </div>
+                    <div class="metric-card report-metric">
+                        <div class="metric-info">
+                            <h3>Period Outflow (Sent)</h3>
+                            <p class="metric-value text-danger" id="report-total-sent">0.00</p>
+                        </div>
+                    </div>
+                    <div class="metric-card report-metric">
+                        <div class="metric-info">
+                            <h3>Net Movement</h3>
+                            <p class="metric-value" id="report-net-change">0.00</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Interactive Visual Analytics Charts -->
+                <div class="analytics-charts-grid">
+                    <div class="chart-card">
+                        <div class="chart-card-header">
+                            <h4>Inflow vs Outflow Cashflow Trend</h4>
+                        </div>
+                        <div class="chart-canvas-wrap">
+                            <canvas id="cashflow-canvas" height="220"></canvas>
+                        </div>
+                    </div>
+                    <div class="chart-card">
+                        <div class="chart-card-header">
+                            <h4>Income by Category</h4>
+                        </div>
+                        <div class="chart-canvas-wrap">
+                            <canvas id="category-canvas" height="220"></canvas>
+                        </div>
+                    </div>
+                    <div class="chart-card">
+                        <div class="chart-card-header">
+                            <h4>Payment Provider Distribution</h4>
+                        </div>
+                        <div class="chart-canvas-wrap">
+                            <canvas id="provider-canvas" height="220"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Printable Financial Statement Table Area -->
+                <div class="printable-statement-card" id="printable-statement-section">
+                    <div class="statement-letterhead">
+                        <div class="statement-logo-box">
+                            <h2 id="stmt-company-name" style="margin:0;font-size:22px;font-weight:900;color:#0f172a;letter-spacing:-0.5px;">Company Financial Statement</h2>
+                            <div id="stmt-company-sub" style="font-size:13px;color:#64748b;margin-top:2px;">Official Financial Audit & Reconciliation Report</div>
+                        </div>
+                        <div class="statement-meta-box">
+                            <div class="stmt-meta-badge" id="stmt-ref-badge">REF: STMT-2026-001</div>
+                            <div id="stmt-period-label" style="font-weight:700;color:#1e293b;font-size:13px;margin-top:4px;">Period: Today</div>
+                            <div id="stmt-generated-date" style="font-size:12px;color:#64748b;">Generated: 2026-09-03 14:00</div>
+                        </div>
+                    </div>
+
+                    <!-- Executive Summary KPI Row for Print/Display -->
+                    <div class="statement-kpi-summary">
+                        <div class="stmt-kpi-box">
+                            <span class="stmt-kpi-label">TOTAL INFLOW (RECEIVED)</span>
+                            <span class="stmt-kpi-val text-success" id="stmt-kpi-received">+ $0.00</span>
+                        </div>
+                        <div class="stmt-kpi-box">
+                            <span class="stmt-kpi-label">TOTAL OUTFLOW (SENT)</span>
+                            <span class="stmt-kpi-val text-danger" id="stmt-kpi-sent">- $0.00</span>
+                        </div>
+                        <div class="stmt-kpi-box" style="border-right:none;">
+                            <span class="stmt-kpi-label">NET FINANCIAL MOVEMENT</span>
+                            <span class="stmt-kpi-val" id="stmt-kpi-net">$0.00</span>
+                        </div>
+                    </div>
+
+                    <!-- Multi-Currency Summary -->
+                    <div class="statement-section-heading">
+                        <h4>1. Multi-Currency Reconciliation</h4>
+                    </div>
+                    <div class="statement-summary-table-wrap">
+                        <table class="statement-table" id="statement-summary-table">
+                            <thead>
+                                <tr>
+                                    <th>Currency</th>
+                                    <th>Total Received (Inflow)</th>
+                                    <th>Total Sent (Outflow)</th>
+                                    <th>Net Balance</th>
+                                </tr>
+                            </thead>
+                            <tbody id="statement-currency-tbody">
+                                <!-- Populated dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Provider Net Balance Section -->
+                    <div class="statement-section-heading" style="margin-top: 24px;">
+                        <h4>2. Net Balance by Payment Provider (Wallets)</h4>
+                    </div>
+                    <div class="statement-summary-table-wrap">
+                        <table class="statement-table" id="statement-provider-table">
+                            <thead>
+                                <tr>
+                                    <th>Payment Provider</th>
+                                    <th>Total Received</th>
+                                    <th>Total Sent</th>
+                                    <th>Net Provider Balance</th>
+                                </tr>
+                            </thead>
+                            <tbody id="statement-provider-tbody">
+                                <!-- Populated dynamically -->
+                            </tbody>
+                            <tfoot id="statement-provider-tfoot">
+                                <!-- Total row populated dynamically -->
+                            </tfoot>
+                        </table>
+                    </div>
+
+                    <!-- Transactions Period Ledger Preview in Statement -->
+                    <div class="statement-section-heading" style="margin-top: 24px;">
+                        <h4>3. Transaction Breakdown in Period</h4>
+                    </div>
+                    <div class="statement-summary-table-wrap">
+                        <table class="statement-table" id="statement-txns-table" style="font-size:12px;">
+                            <thead>
+                                <tr>
+                                    <th>Date & Time</th>
+                                    <th>Type</th>
+                                    <th>Provider</th>
+                                    <th>Party / Phone</th>
+                                    <th>Category</th>
+                                    <th>Amount</th>
+                                </tr>
+                            </thead>
+                            <tbody id="statement-txns-tbody">
+                                <!-- Populated dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Official Signatures & Verification Block -->
+                    <div class="statement-signoff-block">
+                        <div class="signoff-column">
+                            <div class="signoff-line"></div>
+                            <span class="signoff-label">Prepared By (Accountant / Cashier)</span>
+                            <span class="signoff-date" id="signoff-prep-date">Date: 2026-09-03</span>
+                        </div>
+                        <div class="signoff-column">
+                            <div class="signoff-line"></div>
+                            <span class="signoff-label">Authorized Signatory (Business Owner)</span>
+                            <span class="signoff-date" id="signoff-auth-date">Date: 2026-09-03</span>
+                        </div>
+                        <div class="signoff-seal-box">
+                            <span>OFFICIAL STAMP / SEAL</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 4: INVOICES -->
+            <section id="tab-invoices" class="tab-content">
+                <div class="invoices-controls">
+                    <button id="create-invoice-btn" class="btn btn-primary">+ Create Invoice</button>
+                    <input type="text" id="invoice-search" placeholder="Search customer phone, description, reference..." class="search-input">
+                </div>
+                <div class="invoices-container">
+                    <div class="empty-state" id="invoices-empty"><p>No invoices created yet. Click "+ Create Invoice" above to generate your first invoice.</p></div>
+                    <div class="invoices-list" id="invoices-list"></div>
+                </div>
+            </section>
+
+            <!-- TAB 5: CATALOG / MENU / PRODUCTS / FX RATES -->
+            <section id="tab-catalog" class="tab-content">
+                <div class="catalog-header-row">
+                    <div>
+                        <h3 id="catalog-section-title">Menu & Product Catalog</h3>
+                        <p class="text-muted" id="catalog-section-subtitle">Items created here appear on your 1-tap classification screen.</p>
+                    </div>
+                    <div style="display:flex;gap:10px;">
+                        <button id="reset-catalog-btn" class="btn btn-secondary" style="display:none;">Reset to Defaults</button>
+                        <button id="add-catalog-item-btn" class="btn btn-primary">+ Add New Item</button>
+                    </div>
+                </div>
+                
+                <!-- Exchange Rate Quick Editor (For Money Exchange businesses) -->
+                <div id="exchange-rate-manager" class="exchange-rate-card hidden" style="margin-bottom:20px;">
+                    <h4 style="margin:0 0 8px 0;font-size:15px;font-weight:800;color:#1e293b;">Live Exchange Rates Configuration</h4>
+                    <p style="font-size:13px;color:#64748b;margin:0 0 16px 0;">Set market conversion rates used for automatic split conversions and payouts.</p>
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;">
+                        <div class="form-group">
+                            <label>1 USD = ? SLSH (Somaliland Shilling)</label>
+                            <input type="number" id="fx-rate-slsh" class="custom-input" value="11000">
+                        </div>
+                        <div class="form-group">
+                            <label>1 USD = ? ETB (Ethiopian Birr / eBirr)</label>
+                            <input type="number" id="fx-rate-etb" class="custom-input" value="120">
+                        </div>
+                    </div>
+                    <button id="save-fx-rates-btn" class="btn btn-primary" style="margin-top:14px;">Save Live Rates</button>
+
+                    <!-- FX Currency Conversion Quick Calculator (Back Office Tool) -->
+                    <div class="fx-quick-calculator-card" id="catalog-fx-widget" style="margin-top:20px;background:#ffffff;border:1px solid #e2e8f0;border-radius:12px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,0.02);">
+                        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+                            <div style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;color:#0f172a;">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 18V6"/></svg>
+                                <span>Currency Conversion Calculator</span>
+                            </div>
+                            <span class="fx-calc-rate-badge" id="fx-widget-rate-badge" style="font-size:11px;font-weight:700;background:#f8fafc;border:1px solid #cbd5e1;padding:2px 8px;border-radius:16px;color:#334155;">1 USD = 11,000 SLSH</span>
+                        </div>
+                        <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:12px;align-items:center;">
+                            <div>
+                                <label style="font-size:11px;font-weight:600;color:#64748b;display:block;margin-bottom:4px;">USD Amount ($)</label>
+                                <input type="number" id="fx-calc-usd" class="custom-input" placeholder="100.00" value="100" step="any">
+                            </div>
+                            <div style="padding-top:16px;color:#94a3b8;display:flex;justify-content:center;">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M7 10l5-5 5 5"/><path d="M17 14l-5 5-5-5"/></svg>
+                            </div>
+                            <div>
+                                <label style="font-size:11px;font-weight:600;color:#64748b;display:block;margin-bottom:4px;">SLSH Equivalent</label>
+                                <input type="text" id="fx-calc-slsh" class="custom-input" readonly value="1,100,000 SLSH" style="font-weight:700;color:#0f172a;background:#f8fafc;">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="catalog-grid" id="catalog-items-grid">
+                    <!-- Populated dynamically -->
+                </div>
+            </section>
+
+            <!-- TAB 6: SETTINGS -->
+            <section id="tab-settings" class="tab-content">
+                <div class="settings-grid">
+                    <div class="settings-card">
+                        <h3>Business Profile & Configuration</h3>
+                        <p class="text-muted">Configure your business type and live exchange rates.</p>
+                        <div class="input-group" style="margin-top: 12px;">
+                            <label>Business Type</label>
+                            <select id="settings-business-type" class="custom-select">
+                                <option value="restaurant">Restaurant</option>
+                                <option value="money_exchange">Currency / Money Exchange</option>
+                                <option value="retail">Retail / General Store</option>
+                                <option value="pharmacy">Pharmacy</option>
+                                <option value="general_services">General Services</option>
+                            </select>
+                        </div>
+                        <div class="input-group" style="margin-top: 12px;">
+                            <label>Base Accounting Currency</label>
+                            <select id="settings-base-currency" class="custom-select">
+                                <option value="SLSH">Somaliland Shilling (SLSH)</option>
+                                <option value="USD">US Dollar ($)</option>
+                                <option value="ETB">Ethiopian Birr (ETB)</option>
+                            </select>
+                        </div>
+                        <div class="input-group" style="margin-top: 12px;">
+                            <label>Exchange Rate (1 USD = ? SLSH)</label>
+                            <input type="number" id="settings-rate-slsh" class="custom-input" value="11000">
+                        </div>
+                        <button id="save-business-settings-btn" class="btn btn-primary" style="margin-top: 14px;">Save Settings</button>
+                    </div>
+
+                    <div class="settings-card">
+                        <h3>SMS Webhook Integration</h3>
+                        <p class="text-muted">Connect your Android phone or forwarder app to capture ZAAD, eDahab, EVC Plus, and Sahal SMS instantly.</p>
+                        <div class="input-group" style="margin-top:12px;">
+                            <label>Your Webhook URL</label>
+                            <div style="display:flex;gap:8px;align-items:center;">
+                                <input type="text" id="webhook-url-display" class="settings-input" readonly style="font-family:monospace;font-size:13px;flex:1;">
+                                <button id="copy-webhook-btn" class="btn btn-secondary" style="white-space:nowrap;">Copy</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="settings-card danger-zone">
+                        <h3>Danger Zone</h3>
+                        <p class="text-muted">Permanently reset and wipe company transaction data.</p>
+                        <button id="clear-db-btn" class="btn btn-danger">Clear Company Transactions</button>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- ─── ZERO-FRICTION CLASSIFICATION MODAL ──────────────────────────── -->
+    <div id="classify-modal" class="modal hidden">
+        <div class="modal-overlay" id="classify-overlay"></div>
+        <div class="modal-container modal-lg">
+            <div class="modal-header">
+                <div class="classify-head-info">
+                    <span class="classify-badge" id="modal-provider-badge">eDahab</span>
+                    <h3 id="modal-amount-title">Received $10.00</h3>
+                    <p id="modal-sender-subtitle" class="text-muted">From Mohamed Ali</p>
+                </div>
+                <button class="close-btn" id="classify-close-btn">&times;</button>
+            </div>
+            
+            <div class="modal-body" id="classify-modal-body">
+                <!-- Adaptive content rendered dynamically according to business_type -->
+            </div>
+        </div>
+    </div>
+
+    <!-- DETAILS MODAL -->
+    <div id="details-modal" class="modal hidden">
+        <div class="modal-overlay" id="modal-overlay"></div>
+        <div class="modal-container">
+            <div class="modal-header">
+                <h3>Transaction Details & Allocations</h3>
+                <button class="close-btn" id="modal-close-btn">&times;</button>
+            </div>
+            <div class="modal-body" id="modal-body-content"></div>
+        </div>
+    </div>
+
+    <!-- ADD TRANSACTION MODAL -->
+    <div id="new-txn-modal" class="modal hidden">
+        <div class="modal-overlay" id="new-txn-overlay"></div>
+        <div class="modal-container">
+            <div class="modal-header">
+                <h3>+ Record Manual Transaction</h3>
+                <button class="close-btn" id="new-txn-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="manual-txn-form">
+                    <div class="form-group">
+                        <label>Transaction Type</label>
+                        <select id="man-type" class="custom-select">
+                            <option value="Received">Received (Money IN)</option>
+                            <option value="Sent">Sent (Money OUT)</option>
+                        </select>
+                    </div>
+                    <div class="form-row" style="display:flex;gap:10px;">
+                        <div class="form-group" style="flex:2;">
+                            <label>Amount</label>
+                            <input type="number" id="man-amount" class="custom-input" step="any" placeholder="10.00" required>
+                        </div>
+                        <div class="form-group" style="flex:1;">
+                            <label>Currency</label>
+                            <select id="man-currency" class="custom-select">
+                                <option value="USD">USD ($)</option>
+                                <option value="SLSH">SLSH</option>
+                                <option value="ETB">ETB / eBirr</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Provider / Method</label>
+                        <select id="man-provider" class="custom-select">
+                            <option value="eDahab">eDahab</option>
+                            <option value="ZAAD">ZAAD</option>
+                            <option value="EVC Plus">EVC Plus</option>
+                            <option value="Sahal">Sahal</option>
+                            <option value="Cash">Cash / Hand</option>
+                            <option value="Bank">Bank Transfer</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Party Name / Phone</label>
+                        <input type="text" id="man-party" class="custom-input" placeholder="e.g. Hassan Ahmed">
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-full" style="margin-top: 10px;">Save & Classify</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- CATALOG ITEM MODAL -->
+    <div id="catalog-modal" class="modal hidden">
+        <div class="modal-overlay" id="catalog-overlay"></div>
+        <div class="modal-container">
+            <div class="modal-header">
+                <h3>Add Item to Catalog</h3>
+                <button class="close-btn" id="catalog-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="catalog-item-form">
+                    <div class="form-group">
+                        <label>Category</label>
+                        <input type="text" id="cat-category" class="custom-input" placeholder="e.g. FX Services, Remittance, Food" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Item Name</label>
+                        <input type="text" id="cat-name" class="custom-input" placeholder="e.g. USD Cash Exchange" required>
+                    </div>
+                    <div class="form-row" style="display:flex;gap:10px;">
+                        <div class="form-group" style="flex:2;">
+                            <label>Price</label>
+                            <input type="number" id="cat-price" class="custom-input" step="0.01" placeholder="0.00" required>
+                        </div>
+                        <div class="form-group" style="flex:1;">
+                            <label>Currency</label>
+                            <select id="cat-currency" class="custom-select">
+                                <option value="USD">USD ($)</option>
+                                <option value="SLSH">SLSH</option>
+                                <option value="ETB">ETB</option>
+                            </select>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-full" style="margin-top: 12px;">Save Item</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- INVOICE MODAL -->
+    <div id="invoice-modal" class="modal hidden">
+        <div class="modal-overlay" id="invoice-overlay"></div>
+        <div class="modal-container">
+            <div class="modal-header">
+                <h3>Create New Invoice</h3>
+                <button class="close-btn" id="invoice-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Customer Phone (Payment Identifier)</label>
+                    <input type="text" id="invoice-phone" placeholder="e.g. +252615123456 or 615123456" class="custom-input" required>
+                </div>
+                <div class="form-row" style="display:flex;gap:10px;">
+                    <div class="form-group" style="flex:2;">
+                        <label>Amount</label>
+                        <input type="number" id="invoice-amount" placeholder="0.00" class="custom-input" min="0" step="any" required>
+                    </div>
+                    <div class="form-group" style="flex:1;">
+                        <label>Currency</label>
+                        <select id="invoice-currency" class="custom-select">
+                            <option value="USD">USD ($)</option>
+                            <option value="SLSH">SLSH</option>
+                            <option value="ETB">ETB</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Description / Item Details</label>
+                    <textarea id="invoice-description" placeholder="e.g. FX USD Cash Settlement, Order #104" class="custom-input" rows="3"></textarea>
+                </div>
+                <button id="save-invoice-btn" class="btn btn-primary btn-full">Generate & Save Invoice</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- INVOICE PRINT / PREVIEW MODAL -->
+    <div id="invoice-print-modal" class="modal hidden">
+        <div class="modal-overlay" id="invoice-print-overlay"></div>
+        <div class="modal-container modal-lg">
+            <div class="modal-header">
+                <h3>Invoice Preview</h3>
+                <div style="display:flex;gap:8px;align-items:center;">
+                    <button id="execute-print-invoice-btn" class="btn btn-primary btn-sm">Print Invoice</button>
+                    <button class="close-btn" id="invoice-print-close">&times;</button>
+                </div>
+            </div>
+            <div class="modal-body">
+                <div id="printable-invoice-content" class="printable-invoice-card">
+                    <!-- Populated dynamically -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- NOTIFICATION POPUP (WEBSOCKET REALTIME NOTIFICATION) -->
+    <div id="notification-popup" class="notification-popup hidden">
+        <div class="notification-content">
+            <div class="notification-header">
+                <h4>New Payment Received</h4>
+                <button id="close-notification" class="close-btn">&times;</button>
+            </div>
+            <div id="notification-body" class="notification-body"></div>
+            <div class="notification-actions-row">
+                <button id="notification-classify-btn" class="btn btn-primary btn-sm">Classify Transaction</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast-container" class="toast-container"></div>
+
+    <script src="app.js?v=10"></script>
+    <script src="new_features.js?v=3"></script>
+</body>
+</html>
