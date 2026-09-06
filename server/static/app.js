@@ -788,6 +788,11 @@ function connectWebSocket() {
             connText.textContent = 'Live - Connected';
             connText.style.color = 'var(--success)';
         }
+        // Stop polling when WebSocket is live to avoid duplicate fetches
+        if (pollInterval) {
+            clearInterval(pollInterval);
+            pollInterval = null;
+        }
     };
 
     ws.onmessage = (event) => {
@@ -796,7 +801,7 @@ function connectWebSocket() {
     };
 
     ws.onclose = () => {
-        if (pulse) pulse.className = 'pulse-indicator connected';
+        if (pulse) pulse.className = 'pulse-indicator disconnected';
         if (connText) {
             connText.textContent = 'Live (Auto-Sync)';
             connText.style.color = 'var(--success)';
@@ -847,9 +852,14 @@ function bindDashboardEvents() {
     const compareTypeSelect = document.getElementById('compare-type-select');
     const categoryFilter = document.getElementById('category-filter');
 
+    // Debounced search
+    let searchDebounceTimer = null;
     searchInput.addEventListener('input', (event) => {
-        searchQuery = event.target.value;
-        applyFilters();
+        clearTimeout(searchDebounceTimer);
+        searchDebounceTimer = setTimeout(() => {
+            searchQuery = event.target.value;
+            applyFilters();
+        }, 200);
     });
 
     providerFilter.addEventListener('change', (event) => {
@@ -876,15 +886,19 @@ function bindDashboardEvents() {
         });
     }
 
-    sortBySelect.addEventListener('change', (event) => {
-        sortBy = event.target.value;
-        applyFilters();
-    });
+    if (sortBySelect) {
+        sortBySelect.addEventListener('change', (event) => {
+            sortBy = event.target.value;
+            applyFilters();
+        });
+    }
 
-    sortOrderBtn.addEventListener('click', () => {
-        sortOrder = sortOrder === 'desc' ? 'asc' : 'desc';
-        applyFilters();
-    });
+    if (sortOrderBtn) {
+        sortOrderBtn.addEventListener('click', () => {
+            sortOrder = sortOrder === 'desc' ? 'asc' : 'desc';
+            applyFilters();
+        });
+    }
 
     typeFilterBtns.forEach((btn) => {
         btn.addEventListener('click', () => {
