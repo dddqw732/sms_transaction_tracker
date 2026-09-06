@@ -586,6 +586,21 @@ def remove_business_item(item_id: int, company: dict = Depends(get_current_compa
     return {"status": "success"}
 
 
+@app.put("/api/business/items/{item_id}")
+def edit_business_item(item_id: int, payload: BusinessItemPayload, company: dict = Depends(get_current_company)):
+    updated = database.update_business_item(
+        company_id=company["id"],
+        item_id=item_id,
+        category=payload.category,
+        name=payload.name,
+        price=payload.price,
+        currency=payload.currency,
+    )
+    if not updated:
+        raise HTTPException(status_code=404, detail="Item not found")
+    return {"status": "success"}
+
+
 @app.post("/api/transactions")
 async def create_transaction(payload: TransactionPayload, company: dict = Depends(get_current_company)):
     txn_id = database.insert_transaction(
@@ -698,37 +713,6 @@ async def clear_transactions(company: dict = Depends(get_current_company)):
     return {"status": "success", "deleted": deleted}
 
 
-@app.post("/api/invoices")
-def create_invoice(payload: InvoicePayload, company: dict = Depends(get_current_company)):
-    invoice_id = database.create_invoice(
-        company_id=company["id"],
-        invoice_number=payload.invoice_number,
-        customer_phone=payload.customer_phone,
-        amount=payload.amount,
-        currency=payload.currency,
-        description=payload.description,
-    )
-    return {"status": "success", "id": invoice_id}
-
-
-@app.get("/api/invoices")
-def list_invoices(company: dict = Depends(get_current_company)):
-    return database.get_invoices(company["id"])
-
-
-@app.delete("/api/invoices/{invoice_id}")
-def delete_invoice(invoice_id: int, company: dict = Depends(get_current_company)):
-    database.delete_invoice(company["id"], invoice_id)
-    return {"status": "success"}
-
-
-@app.put("/api/invoices/{invoice_id}/status")
-def update_invoice_status(invoice_id: int, status: str, company: dict = Depends(get_current_company)):
-    clean_status = status.strip().lower()
-    if clean_status not in {"pending", "paid", "cancelled"}:
-        raise HTTPException(status_code=400, detail="Invalid invoice status")
-    database.update_invoice_status(company["id"], invoice_id, clean_status)
-    return {"status": "success"}
 
 
 @app.get("/api/notifications")
