@@ -83,12 +83,35 @@ def init_db() -> None:
                     ALTER TABLE transactions ADD COLUMN IF NOT EXISTS category TEXT;
                     ALTER TABLE transactions ADD COLUMN IF NOT EXISTS classification_data TEXT;
                     ALTER TABLE transactions ADD COLUMN IF NOT EXISTS is_classified INTEGER NOT NULL DEFAULT 0;
+                    ALTER TABLE business_items ADD COLUMN IF NOT EXISTS sku TEXT DEFAULT '';
+                    ALTER TABLE business_items ADD COLUMN IF NOT EXISTS description TEXT DEFAULT '';
+                    CREATE TABLE IF NOT EXISTS employees (
+                        id SERIAL PRIMARY KEY,
+                        company_id INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+                        name TEXT NOT NULL,
+                        phone TEXT NOT NULL DEFAULT '',
+                        role TEXT NOT NULL DEFAULT 'Cashier',
+                        pin_code TEXT NOT NULL DEFAULT '1234',
+                        permissions_json TEXT NOT NULL DEFAULT '{"can_classify":true,"can_view_reports":true,"can_manage_items":false,"can_delete":false}',
+                        is_active INTEGER NOT NULL DEFAULT 1,
+                        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                    );
+                    CREATE TABLE IF NOT EXISTS employee_attendance (
+                        id SERIAL PRIMARY KEY,
+                        company_id INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+                        employee_id INTEGER NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+                        action TEXT NOT NULL,
+                        timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                        notes TEXT DEFAULT ''
+                    );
                     CREATE INDEX IF NOT EXISTS idx_transactions_comp_time ON transactions(company_id, timestamp);
                     CREATE INDEX IF NOT EXISTS idx_transactions_comp_id ON transactions(company_id, id);
                     CREATE INDEX IF NOT EXISTS idx_allocations_comp_tx ON transaction_allocations(company_id, transaction_id);
                     CREATE INDEX IF NOT EXISTS idx_audit_comp_time ON audit_logs(company_id, created_at);
                     CREATE INDEX IF NOT EXISTS idx_items_comp ON business_items(company_id);
                     CREATE INDEX IF NOT EXISTS idx_invoices_comp_status ON invoices(company_id, status);
+                    CREATE INDEX IF NOT EXISTS idx_employees_comp ON employees(company_id);
+                    CREATE INDEX IF NOT EXISTS idx_attendance_comp ON employee_attendance(company_id, timestamp);
                 """)
             conn.commit()
         print("[OK] Database initialized (PostgreSQL with migrations).")
@@ -194,6 +217,27 @@ def init_db() -> None:
                 created_at TEXT NOT NULL DEFAULT (datetime('now')),
                 UNIQUE(company_id, transaction_id)
             );
+
+            CREATE TABLE IF NOT EXISTS employees (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                company_id INTEGER NOT NULL REFERENCES companies(id),
+                name TEXT NOT NULL,
+                phone TEXT NOT NULL DEFAULT '',
+                role TEXT NOT NULL DEFAULT 'Cashier',
+                pin_code TEXT NOT NULL DEFAULT '1234',
+                permissions_json TEXT NOT NULL DEFAULT '{"can_classify":true,"can_view_reports":true,"can_manage_items":false,"can_delete":false}',
+                is_active INTEGER NOT NULL DEFAULT 1,
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+
+            CREATE TABLE IF NOT EXISTS employee_attendance (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                company_id INTEGER NOT NULL REFERENCES companies(id),
+                employee_id INTEGER NOT NULL REFERENCES employees(id),
+                action TEXT NOT NULL,
+                timestamp TEXT NOT NULL DEFAULT (datetime('now')),
+                notes TEXT DEFAULT ''
+            );
         """)
 
         # Migration check for existing SQLite tables
@@ -233,6 +277,14 @@ def init_db() -> None:
         if "company_id" not in notif_cols:
             conn.execute("ALTER TABLE notifications ADD COLUMN company_id INTEGER NOT NULL DEFAULT 1")
 
+        # Check business_items
+        cursor.execute("PRAGMA table_info(business_items)")
+        item_cols = [col[1] for col in cursor.fetchall()]
+        if "sku" not in item_cols:
+            conn.execute("ALTER TABLE business_items ADD COLUMN sku TEXT DEFAULT ''")
+        if "description" not in item_cols:
+            conn.execute("ALTER TABLE business_items ADD COLUMN description TEXT DEFAULT ''")
+
         # SQLite Indexes for fast querying
         conn.executescript("""
             CREATE INDEX IF NOT EXISTS idx_transactions_comp_time ON transactions(company_id, timestamp);
@@ -241,6 +293,8 @@ def init_db() -> None:
             CREATE INDEX IF NOT EXISTS idx_audit_comp_time ON audit_logs(company_id, created_at);
             CREATE INDEX IF NOT EXISTS idx_items_comp ON business_items(company_id);
             CREATE INDEX IF NOT EXISTS idx_invoices_comp_status ON invoices(company_id, status);
+            CREATE INDEX IF NOT EXISTS idx_employees_comp ON employees(company_id);
+            CREATE INDEX IF NOT EXISTS idx_attendance_comp ON employee_attendance(company_id, timestamp);
         """)
 
     print("[OK] Database initialized (SQLite local mode with business extensions & indexes).")
@@ -540,17 +594,17 @@ def get_business_items(company_id: int, active_only: bool = True) -> list[dict[s
         return items
 
 
-def create_business_item(company_id: int, category: str, name: str, price: float, currency: str = "USD") -> int:
+def create_business_item(company_id: int, category: str, name: str, price: float, currency: str = "USD", sku: str = "", description: str = "") -> int:
     if using_postgres():
         with _connect() as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
-                    insert into business_items (company_id, category, name, price, currency)
-                    values (%s, %s, %s, %s, %s)
+                    insert into business_items (company_id, category, name, price, currency, sku, description)
+                    values (%s, %s, %s, %s, %s, %s, %s)
                     returning id
                     """,
-                    (company_id, category.strip(), name.strip(), price, currency.strip().upper()),
+                    (company_id, category.strip(), name.strip(), price, currency.strip().upper(), sku.strip(), description.strip()),
                 )
                 row = cur.fetchone()
             conn.commit()
@@ -558,11 +612,60 @@ def create_business_item(company_id: int, category: str, name: str, price: float
 
     with _sqlite() as conn:
         cur = conn.execute(
-            "INSERT INTO business_items (company_id, category, name, price, currency) VALUES (?, ?, ?, ?, ?)",
-            (company_id, category.strip(), name.strip(), price, currency.strip().upper()),
+            "INSERT INTO business_items (company_id, category, name, price, currency, sku, description) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (company_id, category.strip(), name.strip(), price, currency.strip().upper(), sku.strip(), description.strip()),
         )
         conn.commit()
         return cur.lastrowid
+
+
+def create_business_items_bulk(company_id: int, items: list[dict[str, Any]]) -> int:
+    """Inserts a batch of business catalog items efficiently."""
+    if not items:
+        return 0
+
+    inserted_count = 0
+    if using_postgres():
+        with _connect() as conn:
+            with conn.cursor() as cur:
+                for it in items:
+                    name = str(it.get("name") or "").strip()
+                    if not name:
+                        continue
+                    cat = str(it.get("category") or "General").strip()
+                    price = float(it.get("price") or 0.0)
+                    cur_code = str(it.get("currency") or "USD").strip().upper()
+                    sku = str(it.get("sku") or "").strip()
+                    desc = str(it.get("description") or "").strip()
+                    cur.execute(
+                        """
+                        insert into business_items (company_id, category, name, price, currency, sku, description)
+                        values (%s, %s, %s, %s, %s, %s, %s)
+                        """,
+                        (company_id, cat, name, price, cur_code, sku, desc),
+                    )
+                    inserted_count += 1
+            conn.commit()
+        return inserted_count
+
+    with _sqlite() as conn:
+        for it in items:
+            name = str(it.get("name") or "").strip()
+            if not name:
+                continue
+            cat = str(it.get("category") or "General").strip()
+            price = float(it.get("price") or 0.0)
+            cur_code = str(it.get("currency") or "USD").strip().upper()
+            sku = str(it.get("sku") or "").strip()
+            desc = str(it.get("description") or "").strip()
+            conn.execute(
+                "INSERT INTO business_items (company_id, category, name, price, currency, sku, description) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (company_id, cat, name, price, cur_code, sku, desc),
+            )
+            inserted_count += 1
+        conn.commit()
+    return inserted_count
+
 
 
 def delete_business_item(company_id: int, item_id: int) -> None:
@@ -1281,3 +1384,227 @@ def delete_all_notifications(company_id: int) -> None:
     with _sqlite() as conn:
         conn.execute("DELETE FROM notifications WHERE company_id = ?", (company_id,))
         conn.commit()
+
+
+# ─── Employees & Attendance ───────────────────────────────────────────────────
+
+def get_employees(company_id: int) -> list[dict[str, Any]]:
+    if using_postgres():
+        with _connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    select id, company_id, name, phone, role, pin_code, permissions_json, is_active, created_at
+                    from employees
+                    where company_id = %s
+                    order by is_active desc, role, name
+                    """,
+                    (company_id,),
+                )
+                return [dict(row) for row in cur.fetchall()]
+
+    with _sqlite() as conn:
+        rows = conn.execute(
+            """
+            SELECT id, company_id, name, phone, role, pin_code, permissions_json, is_active, created_at
+            FROM employees
+            WHERE company_id = ?
+            ORDER BY is_active DESC, role, name
+            """,
+            (company_id,),
+        ).fetchall()
+        return _rows_to_dicts(rows)
+
+
+def create_employee(
+    company_id: int,
+    name: str,
+    phone: str = "",
+    role: str = "Cashier",
+    pin_code: str = "1234",
+    permissions_json: str = "{}",
+) -> int:
+    default_perms = '{"can_classify":true,"can_view_reports":true,"can_manage_items":false,"can_delete":false}'
+    perms = permissions_json if permissions_json and permissions_json.strip() != "{}" else default_perms
+
+    if using_postgres():
+        with _connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    insert into employees (company_id, name, phone, role, pin_code, permissions_json, is_active)
+                    values (%s, %s, %s, %s, %s, %s, 1)
+                    returning id
+                    """,
+                    (company_id, name.strip(), phone.strip(), role.strip(), pin_code.strip(), perms),
+                )
+                row = cur.fetchone()
+            conn.commit()
+            return int(row["id"])
+
+    with _sqlite() as conn:
+        cur = conn.execute(
+            """
+            INSERT INTO employees (company_id, name, phone, role, pin_code, permissions_json, is_active)
+            VALUES (?, ?, ?, ?, ?, ?, 1)
+            """,
+            (company_id, name.strip(), phone.strip(), role.strip(), pin_code.strip(), perms),
+        )
+        conn.commit()
+        return cur.lastrowid
+
+
+def update_employee(
+    company_id: int,
+    employee_id: int,
+    name: str,
+    phone: str,
+    role: str,
+    pin_code: str,
+    permissions_json: str,
+    is_active: int = 1,
+) -> bool:
+    if using_postgres():
+        with _connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    update employees
+                    set name = %s, phone = %s, role = %s, pin_code = %s, permissions_json = %s, is_active = %s
+                    where id = %s and company_id = %s
+                    """,
+                    (name.strip(), phone.strip(), role.strip(), pin_code.strip(), permissions_json, is_active, employee_id, company_id),
+                )
+                affected = cur.rowcount
+            conn.commit()
+            return affected > 0
+
+    with _sqlite() as conn:
+        cur = conn.execute(
+            """
+            UPDATE employees
+            SET name = ?, phone = ?, role = ?, pin_code = ?, permissions_json = ?, is_active = ?
+            WHERE id = ? AND company_id = ?
+            """,
+            (name.strip(), phone.strip(), role.strip(), pin_code.strip(), permissions_json, is_active, employee_id, company_id),
+        )
+        conn.commit()
+        return cur.rowcount > 0
+
+
+def delete_employee(company_id: int, employee_id: int) -> bool:
+    if using_postgres():
+        with _connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute("delete from employees where id = %s and company_id = %s", (employee_id, company_id))
+                affected = cur.rowcount
+            conn.commit()
+            return affected > 0
+
+    with _sqlite() as conn:
+        cur = conn.execute("DELETE FROM employees WHERE id = ? AND company_id = ?", (employee_id, company_id))
+        conn.commit()
+        return cur.rowcount > 0
+
+
+def record_employee_attendance(company_id: int, employee_id: int, action: str, notes: str = "") -> int:
+    action_clean = action.strip().lower()  # check_in or check_out
+    if using_postgres():
+        with _connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    insert into employee_attendance (company_id, employee_id, action, notes)
+                    values (%s, %s, %s, %s)
+                    returning id
+                    """,
+                    (company_id, employee_id, action_clean, notes.strip()),
+                )
+                row = cur.fetchone()
+            conn.commit()
+            return int(row["id"])
+
+    with _sqlite() as conn:
+        cur = conn.execute(
+            """
+            INSERT INTO employee_attendance (company_id, employee_id, action, notes)
+            VALUES (?, ?, ?, ?)
+            """,
+            (company_id, employee_id, action_clean, notes.strip()),
+        )
+        conn.commit()
+        return cur.lastrowid
+
+
+def get_employee_attendance(company_id: int, limit: int = 50) -> list[dict[str, Any]]:
+    if using_postgres():
+        with _connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    select a.id, a.company_id, a.employee_id, a.action, a.timestamp, a.notes,
+                           e.name as employee_name, e.role as employee_role
+                    from employee_attendance a
+                    join employees e on e.id = a.employee_id
+                    where a.company_id = %s
+                    order by a.timestamp desc
+                    limit %s
+                    """,
+                    (company_id, limit),
+                )
+                return [dict(row) for row in cur.fetchall()]
+
+    with _sqlite() as conn:
+        rows = conn.execute(
+            """
+            SELECT a.id, a.company_id, a.employee_id, a.action, a.timestamp, a.notes,
+                   e.name as employee_name, e.role as employee_role
+            FROM employee_attendance a
+            JOIN employees e ON e.id = a.employee_id
+            WHERE a.company_id = ?
+            ORDER BY a.timestamp DESC
+            LIMIT ?
+            """,
+            (company_id, limit),
+        ).fetchall()
+        return _rows_to_dicts(rows)
+
+
+def get_employee_sales_stats(company_id: int) -> list[dict[str, Any]]:
+    """Calculates sales total and transaction counts per employee."""
+    employees = get_employees(company_id)
+    txns = get_transactions(company_id)
+
+    stats = {}
+    for emp in employees:
+        stats[emp["name"].lower()] = {
+            "employee_id": emp["id"],
+            "name": emp["name"],
+            "role": emp["role"],
+            "transactions_count": 0,
+            "total_sales_usd": 0.0,
+            "total_sales_slsh": 0.0,
+        }
+
+    for t in txns:
+        if t.get("type") != "Received":
+            continue
+        c_data_str = t.get("classification_data") or "{}"
+        try:
+            c_data = json.loads(c_data_str) if isinstance(c_data_str, str) else c_data_str
+        except Exception:
+            c_data = {}
+        
+        emp_name = (c_data.get("classified_by") or "").strip().lower()
+        amt = float(t.get("amount") or 0.0)
+        cur = (t.get("currency") or "USD").upper()
+
+        if emp_name and emp_name in stats:
+            stats[emp_name]["transactions_count"] += 1
+            if cur == "SLSH":
+                stats[emp_name]["total_sales_slsh"] += amt
+            else:
+                stats[emp_name]["total_sales_usd"] += amt
+
+    return list(stats.values())
+
