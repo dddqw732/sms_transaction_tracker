@@ -135,6 +135,34 @@ class BusinessItemPayload(BaseModel):
     name: str = Field(min_length=1)
     price: float = Field(ge=0)
     currency: str = "USD"
+    sku: Optional[str] = ""
+    description: Optional[str] = ""
+
+
+class BulkBusinessItemsPayload(BaseModel):
+    items: list[dict[str, Any]] = []
+
+
+class EmployeeCreatePayload(BaseModel):
+    name: str = Field(min_length=1)
+    phone: Optional[str] = ""
+    role: Optional[str] = "Cashier"
+    pin_code: Optional[str] = "1234"
+    permissions_json: Optional[str] = "{}"
+
+
+class EmployeeUpdatePayload(BaseModel):
+    name: str = Field(min_length=1)
+    phone: str = ""
+    role: str = "Cashier"
+    pin_code: str = "1234"
+    permissions_json: str = "{}"
+    is_active: int = 1
+
+
+class AttendancePayload(BaseModel):
+    action: str = "check_in"
+    notes: Optional[str] = ""
 
 
 class AllocationItem(BaseModel):
@@ -154,6 +182,8 @@ class ClassifyPayload(BaseModel):
     category: str = Field(min_length=1)
     allocations: list[AllocationItem] = []
     notes: Optional[str] = None
+    employee_name: Optional[str] = None
+
 
 
 class LoginPayload(BaseModel):
@@ -576,8 +606,16 @@ def add_business_item(payload: BusinessItemPayload, company: dict = Depends(get_
         name=payload.name,
         price=payload.price,
         currency=payload.currency,
+        sku=payload.sku or "",
+        description=payload.description or "",
     )
     return {"status": "success", "id": item_id}
+
+
+@app.post("/api/business/items/bulk")
+def add_business_items_bulk(payload: BulkBusinessItemsPayload, company: dict = Depends(get_current_company)):
+    count = database.create_business_items_bulk(company["id"], payload.items)
+    return {"status": "success", "count": count}
 
 
 @app.delete("/api/business/items/{item_id}")
@@ -640,12 +678,13 @@ async def create_transaction(payload: TransactionPayload, company: dict = Depend
 @app.post("/api/transactions/{txn_id}/classify")
 async def classify_txn(txn_id: int, payload: ClassifyPayload, company: dict = Depends(get_current_company)):
     alloc_dicts = [a.model_dump() for a in payload.allocations]
+    classifier_name = payload.employee_name or company.get("company_name", "Owner")
     success = database.classify_transaction(
         company_id=company["id"],
         transaction_id=txn_id,
         category=payload.category,
         allocations=alloc_dicts,
-        changed_by=company.get("company_name", "Owner"),
+        changed_by=classifier_name,
         notes=payload.notes,
     )
     if not success:
@@ -884,8 +923,8 @@ async def seed_mock_transactions(company: dict = Depends(get_current_company)):
     providers = [
         ("eDahab",   "SLSH"),
         ("ZAAD",     "USD"),
-        ("EVC Plus", "USD"),
-        ("Sahal",    "SLSH"),
+        ("Soltelco", "USD"),
+        ("Soltelco", "SLSH"),
     ]
 
     somali_names = [
@@ -954,6 +993,72 @@ async def seed_mock_transactions(company: dict = Depends(get_current_company)):
             inserted += 1
 
     return {"status": "success", "inserted": inserted, "total_attempted": len(mock_set)}
+
+
+# ─── Employee Management & Attendance Endpoints ───────────────────────────────
+
+@app.get("/api/employees")
+def list_employees(company: dict = Depends(get_current_company)):
+    return database.get_employees(company["id"])
+
+
+@app.post("/api/employees")
+def add_employee(payload: EmployeeCreatePayload, company: dict = Depends(get_current_company)):
+    emp_id = database.create_employee(
+        company_id=company["id"],
+        name=payload.name,
+        phone=payload.phone or "",
+        role=payload.role or "Cashier",
+        pin_code=payload.pin_code or "1234",
+        permissions_json=payload.permissions_json or "{}",
+    )
+    return {"status": "success", "id": emp_id}
+
+
+@app.put("/api/employees/{employee_id}")
+def update_employee_profile(employee_id: int, payload: EmployeeUpdatePayload, company: dict = Depends(get_current_company)):
+    updated = database.update_employee(
+        company_id=company["id"],
+        employee_id=employee_id,
+        name=payload.name,
+        phone=payload.phone,
+        role=payload.role,
+        pin_code=payload.pin_code,
+        permissions_json=payload.permissions_json,
+        is_active=payload.is_active,
+    )
+    if not updated:
+        raise HTTPException(status_code=404, detail="Employee not found")
+    return {"status": "success"}
+
+
+@app.delete("/api/employees/{employee_id}")
+def remove_employee(employee_id: int, company: dict = Depends(get_current_company)):
+    deleted = database.delete_employee(company["id"], employee_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Employee not found")
+    return {"status": "success"}
+
+
+@app.post("/api/employees/{employee_id}/attendance")
+def record_attendance(employee_id: int, payload: AttendancePayload, company: dict = Depends(get_current_company)):
+    rec_id = database.record_employee_attendance(
+        company_id=company["id"],
+        employee_id=employee_id,
+        action=payload.action,
+        notes=payload.notes or "",
+    )
+    return {"status": "success", "id": rec_id}
+
+
+@app.get("/api/employees/attendance")
+def list_attendance(limit: int = 50, company: dict = Depends(get_current_company)):
+    return database.get_employee_attendance(company["id"], limit=limit)
+
+
+@app.get("/api/employees/sales-report")
+def employee_sales_report(company: dict = Depends(get_current_company)):
+    return database.get_employee_sales_stats(company["id"])
 
 
 APK_DIR = Path(__file__).parent / "downloads"
