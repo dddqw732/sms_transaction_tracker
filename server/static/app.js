@@ -277,10 +277,9 @@ function updateClock() {
 function getProviderClass(provider) {
     if (!provider) return 'default';
     const p = provider.toLowerCase();
-    if (p.includes('evc')) return 'evc';
     if (p.includes('edahab')) return 'edahab';
     if (p.includes('zaad')) return 'zaad';
-    if (p.includes('sahal')) return 'sahal';
+    if (p.includes('soltelco') || p.includes('somtel')) return 'soltelco';
     return 'default';
 }
 
@@ -288,9 +287,7 @@ function getProviderLogo(provider) {
     if (!provider) return null;
     const p = provider.toLowerCase();
     if (p.includes('zaad')) return '/zaad_logo.png';
-    if (p.includes('evc')) return '/evc_logo.png';
     if (p.includes('edahab')) return '/edahab_logo.png';
-    if (p.includes('sahal')) return '/sahal_logo.png';
     return null;
 }
 
@@ -635,19 +632,27 @@ async function showTxnDetails(txnId) {
 
     body.innerHTML = `
         <div class="modal-detail-row"><div class="modal-detail-label">Type</div><div class="modal-detail-value">${txn.type}</div></div>
-        <div class="modal-detail-row"><div class="modal-detail-label">Category</div><div class="modal-detail-value"><b>${txn.category || 'Unclassified'}</b></div></div>
-        <div class="modal-detail-row"><div class="modal-detail-label">Amount</div><div class="modal-detail-value">${formatAmount(txn.amount, txn.currency)}</div></div>
+        <div class="modal-detail-row"><div class="modal-detail-label">Category</div><div class="modal-detail-value"><span class="badge" style="background:rgba(99,102,241,0.1);color:#6366f1;font-weight:700;padding:3px 10px;border-radius:12px;">${txn.category || 'Unclassified'}</span></div></div>
+        <div class="modal-detail-row"><div class="modal-detail-label">Amount</div><div class="modal-detail-value font-bold">${formatAmount(txn.amount, txn.currency)}</div></div>
         <div class="modal-detail-row"><div class="modal-detail-label">Provider</div><div class="modal-detail-value">${txn.provider || 'N/A'}</div></div>
         <div class="modal-detail-row"><div class="modal-detail-label">Transaction ID</div><div class="modal-detail-value">${txn.transaction_id || 'N/A'}</div></div>
         <div class="modal-detail-row"><div class="modal-detail-label">Sender</div><div class="modal-detail-value">${txn.sender || 'N/A'}</div></div>
         <div class="modal-detail-row"><div class="modal-detail-label">Receiver</div><div class="modal-detail-value">${txn.receiver || 'N/A'}</div></div>
         <div class="modal-detail-row"><div class="modal-detail-label">Date</div><div class="modal-detail-value">${dateStr}</div></div>
+        ${txn.classification_data ? `
+        <div class="modal-detail-row"><div class="modal-detail-label">Classified By</div><div class="modal-detail-value" style="color:#059669;font-weight:700;">👤 ${(function(){ try { return JSON.parse(txn.classification_data).classified_by || 'Staff'; } catch(e){ return 'Staff'; } })()}</div></div>
+        ` : ''}
         <div style="margin-top:12px;">
-            <div class="modal-detail-label">Allocations & Item Breakdown</div>
+            <div class="modal-detail-label" style="font-weight:700;color:#0f172a;margin-bottom:4px;">Allocations & Item Breakdown</div>
             ${allocationsHtml}
         </div>
-        <div style="margin-top:14px;">
-            <button class="btn btn-primary btn-full" onclick="hideTxnDetails(); if (typeof openClassifyModal === 'function') openClassifyModal(window.allTransactions.find(t=>t.id===${txn.id}))">⚡ Reclassify / Split FX</button>
+        <div style="display:flex;gap:10px;margin-top:16px;">
+            <button class="btn btn-secondary btn-full" onclick="hideTxnDetails(); if (typeof window.openReceiptModal === 'function') window.openReceiptModal(${txn.id});" style="display:flex;align-items:center;justify-content:center;gap:6px;">
+                <span>🧾 View Receipt</span>
+            </button>
+            <button class="btn btn-primary btn-full" onclick="hideTxnDetails(); if (typeof openClassifyModal === 'function') openClassifyModal(window.allTransactions.find(t=>t.id===${txn.id}))">
+                <span>⚡ Reclassify</span>
+            </button>
         </div>
         <div style="margin-top:12px;"><div class="modal-detail-label">Raw SMS</div><div class="modal-raw-sms">${txn.raw_sms || ''}</div></div>
     `;
