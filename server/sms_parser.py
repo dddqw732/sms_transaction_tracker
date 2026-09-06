@@ -105,12 +105,8 @@ def parse_sms(sms_body: str, sender_number: str = "") -> dict | None:
     provider = "ZAAD"
     if "edahab" in combine or "dahab" in combine:
         provider = "eDahab"
-    elif "evc" in combine or "hormuud" in combine:
-        provider = "EVC Plus"
-    elif "sahal" in combine or "golis" in combine:
-        provider = "Sahal"
-    elif "mpesa" in combine or "m-pesa" in combine or "safaricom" in combine:
-        provider = "M-Pesa"
+    elif "soltelco" in combine or "somtel" in combine:
+        provider = "Soltelco"
     elif "zaad" in combine or "telesom" in combine:
         provider = "ZAAD"
     elif "slsh" in combine or "ka heshay" in combine or "ayaad u dirtay" in combine:
