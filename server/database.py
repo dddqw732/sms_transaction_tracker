@@ -578,6 +578,35 @@ def delete_business_item(company_id: int, item_id: int) -> None:
         conn.commit()
 
 
+def update_business_item(company_id: int, item_id: int, category: str, name: str, price: float, currency: str = "USD") -> bool:
+    if using_postgres():
+        with _connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    update business_items
+                    set category = %s, name = %s, price = %s, currency = %s
+                    where id = %s and company_id = %s
+                    """,
+                    (category.strip(), name.strip(), price, currency.strip().upper(), item_id, company_id),
+                )
+                affected = cur.rowcount
+            conn.commit()
+            return affected > 0
+
+    with _sqlite() as conn:
+        cur = conn.execute(
+            """
+            UPDATE business_items
+            SET category = ?, name = ?, price = ?, currency = ?
+            WHERE id = ? AND company_id = ?
+            """,
+            (category.strip(), name.strip(), price, currency.strip().upper(), item_id, company_id),
+        )
+        conn.commit()
+        return cur.rowcount > 0
+
+
 # ─── Transactions ─────────────────────────────────────────────────────────────
 
 def insert_transaction(
@@ -1024,7 +1053,7 @@ def get_analytics_report(
         "category_breakdown": cat_breakdown,
         "provider_breakdown": prov_breakdown,
         "daily_timeline": sorted_timeline,
-        "transactions_preview": transactions[:50],
+        "transactions_preview": transactions,
     }
 
 
