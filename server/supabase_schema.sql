@@ -97,3 +97,25 @@ CREATE TABLE IF NOT EXISTS notifications (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     UNIQUE(company_id, transaction_id)
 );
+
+CREATE TABLE IF NOT EXISTS employees (
+    id SERIAL PRIMARY KEY,
+    company_id INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    phone TEXT NOT NULL DEFAULT '',
+    role TEXT NOT NULL DEFAULT 'Cashier',
+    pin_code TEXT NOT NULL DEFAULT '1234',
+    permissions_json TEXT NOT NULL DEFAULT '{"can_classify":true,"can_view_reports":true,"can_manage_items":false,"can_delete":false}',
+    is_active INTEGER NOT NULL DEFAULT 1,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS employee_attendance (
+    id SERIAL PRIMARY KEY,
+    company_id INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    employee_id INTEGER NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+    action TEXT NOT NULL,
+    timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    notes TEXT DEFAULT ''
+);
+
