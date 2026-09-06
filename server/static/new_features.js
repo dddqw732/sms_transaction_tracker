@@ -325,10 +325,10 @@ window.initProviderCollapsible = initProviderCollapsible;
 
 // ─── Live FX Currency Calculator Widget ──────────────────────────────────────
 function initFxCalculatorWidget() {
-    const usdInput = document.getElementById('fx-calc-usd');
-    const slshInput = document.getElementById('fx-calc-slsh');
-    const rateBadge = document.getElementById('fx-widget-rate-badge');
-    if (!usdInput || !slshInput) return;
+    // Catalog FX Widget (inside Exchange Rate Manager)
+    const catalogUsdInput = document.getElementById('catalog-fx-calc-usd');
+    const catalogSlshInput = document.getElementById('catalog-fx-calc-slsh');
+    const catalogRateBadge = document.getElementById('catalog-fx-rate-badge');
 
     function getRate() {
         let rate = 11000;
@@ -341,17 +341,18 @@ function initFxCalculatorWidget() {
         return rate;
     }
 
-    function syncWidget() {
+    function syncCatalogWidget() {
         const rate = getRate();
-        if (rateBadge) rateBadge.textContent = `1 USD = ${rate.toLocaleString()} SLSH`;
-        const usdVal = parseFloat(usdInput.value) || 0;
+        if (catalogRateBadge) catalogRateBadge.textContent = `1 USD = ${rate.toLocaleString()} SLSH`;
+        if (!catalogUsdInput || !catalogSlshInput) return;
+        const usdVal = parseFloat(catalogUsdInput.value) || 0;
         const slshVal = usdVal * rate;
-        slshInput.value = `${slshVal.toLocaleString(undefined, { maximumFractionDigits: 0 })} SLSH`;
+        catalogSlshInput.value = `${slshVal.toLocaleString(undefined, { maximumFractionDigits: 0 })} SLSH`;
     }
 
-    usdInput.addEventListener('input', syncWidget);
-    window.syncFxWidget = syncWidget;
-    syncWidget();
+    if (catalogUsdInput) catalogUsdInput.addEventListener('input', syncCatalogWidget);
+    window.syncFxWidget = syncCatalogWidget;
+    syncCatalogWidget();
 }
 
 // ─── Quick Filter Presets Bar ────────────────────────────────────────────────
@@ -478,59 +479,113 @@ function renderAdaptiveClassificationBody(txn) {
     }
 }
 
+function getItemPriceInTxnCurrency(item, targetCur) {
+    const itemCur = item.currency || 'USD';
+    if (itemCur === targetCur) return Number(item.price) || 0;
+    return calculateConverted(Number(item.price) || 0, itemCur, targetCur);
+}
+
+function formatCurrencyAmount(amount, currency) {
+    const cur = (currency || 'USD').toUpperCase();
+    const num = Number(amount) || 0;
+    if (cur === 'SLSH') {
+        return `${Math.round(num).toLocaleString()} SLSH`;
+    } else if (cur === 'USD') {
+        return `$${num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    } else {
+        return `${num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${cur}`;
+    }
+}
+
 // ─── 4A. Restaurant Workflow (Menu Cards & 1-Tap Presets) ─────────────────────
 function renderRestaurantWorkflow(container, txn) {
     selectedMenuItems = {};
     const wrap = document.createElement('div');
 
+    const txnCurrency = (txn.currency || 'USD').toUpperCase();
+    const txnAmtFormatted = formatCurrencyAmount(txn.amount, txnCurrency);
+
     wrap.innerHTML = `
         <div class="menu-items-section-title">
-            <span>Quick 1-Tap Category</span>
+            <span>Filter Category / Quick 1-Tap:</span>
         </div>
-        <div class="quick-preset-row">
-            <button class="preset-btn active" data-cat="Orders">Food Order</button>
-            <button class="preset-btn" data-cat="Drinks">Drinks</button>
-            <button class="preset-btn" data-cat="Delivery">Delivery</button>
-            <button class="preset-btn" data-cat="Takeout">Takeout</button>
-            <button class="preset-btn" data-cat="Customer Payment">Payment</button>
+        <div class="quick-preset-row" id="classify-preset-row">
+            <button class="preset-btn active" data-cat="All">All Items</button>
+            <button class="preset-btn" data-cat="Mains">Mains / Bariis</button>
+            <button class="preset-btn" data-cat="Breakfast">Breakfast</button>
+            <button class="preset-btn" data-cat="Starters">Starters / Sambuus</button>
+            <button class="preset-btn" data-cat="Drinks">Drinks / Shaah</button>
+            <button class="preset-btn" data-cat="Desserts">Desserts / Xalwo</button>
         </div>
 
-        <div class="menu-items-section-title">
-            <span>Select Menu Items (Optional)</span>
-            <span id="order-sum-indicator" style="font-weight:700;color:#10b981;">Selected: $0.00 / $${txn.amount}</span>
+        <div class="menu-items-section-title" style="margin-top:14px;">
+            <span>Select Menu Items (Optional):</span>
+            <span id="order-sum-indicator" style="font-weight:700;color:#10b981;">Selected: ${formatCurrencyAmount(0, txnCurrency)} / ${txnAmtFormatted}</span>
         </div>
         <div class="menu-items-grid" id="modal-menu-grid">
             <!-- Rendered from catalog items -->
         </div>
+        <div id="order-overalloc-warning" style="display:none;color:#dc2626;font-size:12px;font-weight:700;margin-top:8px;padding:8px 12px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.25);border-radius:6px;">
+            ⚠️ Selected items exceed the received amount. Please deselect or right-click to reduce quantity.
+        </div>
 
         <div style="margin-top:16px;display:flex;gap:10px;">
-            <button id="btn-submit-classification" class="btn btn-primary btn-full">Confirm & Save Order</button>
+            <button id="btn-submit-classification" class="btn btn-primary btn-full">Confirm &amp; Save Classification</button>
         </div>
     `;
 
     container.appendChild(wrap);
 
-    // Preset buttons click
-    const presetBtns = wrap.querySelectorAll('.preset-btn');
-    let selectedCategory = 'Orders';
+    const grid = wrap.querySelector('#modal-menu-grid');
+
+    // Filter menu cards when clicking preset buttons
+    const presetRow = wrap.querySelector('#classify-preset-row');
+    const presetBtns = presetRow.querySelectorAll('.preset-btn');
     presetBtns.forEach(btn => {
         btn.addEventListener('click', () => {
             presetBtns.forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
-            selectedCategory = btn.dataset.cat;
+            const targetCat = btn.dataset.cat;
+            
+            // Filter cards in grid
+            const cards = grid.querySelectorAll('.menu-item-card');
+            cards.forEach(card => {
+                const itemCat = card.dataset.category || '';
+                if (targetCat === 'All' || itemCat.toLowerCase() === targetCat.toLowerCase()) {
+                    card.style.display = 'flex';
+                } else {
+                    card.style.display = 'none';
+                }
+            });
         });
     });
 
+    // Helper to get selected category from DOM
+    function getSelectedCategory() {
+        const activeBtn = presetRow.querySelector('.preset-btn.active');
+        const cat = activeBtn ? activeBtn.dataset.cat : 'Orders';
+        return cat === 'All' ? 'Orders' : cat;
+    }
+
     // Populate Menu Items
-    const grid = wrap.querySelector('#modal-menu-grid');
     if (allCatalogItems && allCatalogItems.length > 0) {
         allCatalogItems.forEach(item => {
+            const itemCurrency = (item.currency || 'USD').toUpperCase();
+            const itemPriceInTxnCur = getItemPriceInTxnCurrency(item, txnCurrency);
+            
+            // Format price: if item currency differs from txn currency, show converted note
+            let priceLabel = formatCurrencyAmount(item.price, itemCurrency);
+            if (itemCurrency !== txnCurrency) {
+                priceLabel += ` (≈ ${formatCurrencyAmount(itemPriceInTxnCur, txnCurrency)})`;
+            }
+
             const card = document.createElement('div');
             card.className = 'menu-item-card';
+            card.dataset.category = item.category || 'Mains';
             card.innerHTML = `
                 <span class="mic-name">${item.name}</span>
                 <div class="mic-bottom">
-                    <span class="mic-price">$${Number(item.price).toFixed(2)}</span>
+                    <span class="mic-price" style="font-size:11px;">${priceLabel}</span>
                     <span class="mic-qty hidden" id="qty-${item.id}">0</span>
                 </div>
             `;
@@ -541,28 +596,56 @@ function renderRestaurantWorkflow(container, txn) {
                 const qtyBadge = card.querySelector(`#qty-${item.id}`);
                 qtyBadge.textContent = `${selectedMenuItems[item.id]}x`;
                 qtyBadge.classList.remove('hidden');
-
-                // Update sum
-                updateOrderSum(txn.amount);
+                updateOrderSum(txn);
+            });
+            // Right-click or long-press to remove
+            card.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                if (selectedMenuItems[item.id] > 0) {
+                    selectedMenuItems[item.id]--;
+                    if (selectedMenuItems[item.id] === 0) {
+                        delete selectedMenuItems[item.id];
+                        card.classList.remove('selected');
+                        const qtyBadge = card.querySelector(`#qty-${item.id}`);
+                        qtyBadge.classList.add('hidden');
+                    } else {
+                        const qtyBadge = card.querySelector(`#qty-${item.id}`);
+                        qtyBadge.textContent = `${selectedMenuItems[item.id]}x`;
+                    }
+                    updateOrderSum(txn);
+                }
             });
             grid.appendChild(card);
         });
     } else {
-        grid.innerHTML = '<p class="text-muted" style="grid-column:1/-1;font-size:12px;">No menu items configured yet. You can add them in the Menu tab.</p>';
+        grid.innerHTML = '<p class="text-muted" style="grid-column:1/-1;font-size:12px;padding:12px;background:#f8fafc;border-radius:8px;">No menu items configured yet. Go to <b>Menu &amp; Products</b> tab to add items or load the Somali Menu.</p>';
     }
 
     // Submit Action
     wrap.querySelector('#btn-submit-classification').addEventListener('click', () => {
+        // Validate: check for over-allocation
+        let sumInTxnCur = 0;
+        for (const [itemId, qty] of Object.entries(selectedMenuItems)) {
+            const item = allCatalogItems.find(i => i.id == itemId);
+            if (item) sumInTxnCur += getItemPriceInTxnCurrency(item, txnCurrency) * qty;
+        }
+        if (sumInTxnCur > Number(txn.amount) + 0.05 && Object.keys(selectedMenuItems).length > 0) {
+            alert('Cannot classify more than the received amount.');
+            return;
+        }
+
+        const selectedCategory = getSelectedCategory();
         const allocations = [];
         for (const [itemId, qty] of Object.entries(selectedMenuItems)) {
             const item = allCatalogItems.find(i => i.id == itemId);
             if (item) {
+                const convertedPrice = getItemPriceInTxnCurrency(item, txnCurrency);
                 allocations.push({
                     allocation_type: 'product_sale',
-                    target_currency: item.currency || 'USD',
+                    target_currency: item.currency || txnCurrency,
                     original_allocated_amount: item.price * qty,
-                    converted_amount: item.price * qty,
-                    exchange_rate: 1.0,
+                    converted_amount: convertedPrice * qty,
+                    exchange_rate: item.price ? (convertedPrice / item.price) : 1.0,
                     delivery_method: 'cash_hand',
                     item_id: item.id,
                     item_name: item.name,
@@ -575,15 +658,38 @@ function renderRestaurantWorkflow(container, txn) {
     });
 }
 
-function updateOrderSum(targetAmount) {
-    let sum = 0;
+function updateOrderSum(txn) {
+    const txnCurrency = (txn.currency || 'USD').toUpperCase();
+    let sumInTxnCur = 0;
     for (const [itemId, qty] of Object.entries(selectedMenuItems)) {
         const item = allCatalogItems.find(i => i.id == itemId);
-        if (item) sum += item.price * qty;
+        if (item) {
+            sumInTxnCur += getItemPriceInTxnCurrency(item, txnCurrency) * qty;
+        }
     }
     const el = document.getElementById('order-sum-indicator');
+    const warning = document.getElementById('order-overalloc-warning');
+    const submitBtn = document.getElementById('btn-submit-classification');
+    const txnAmt = Number(txn.amount);
+    const isOver = sumInTxnCur > txnAmt + 0.05;
+
     if (el) {
-        el.textContent = `Selected: $${sum.toFixed(2)} / $${Number(targetAmount).toFixed(2)}`;
+        el.textContent = `Selected: ${formatCurrencyAmount(sumInTxnCur, txnCurrency)} / ${formatCurrencyAmount(txnAmt, txnCurrency)}`;
+        el.style.color = isOver ? '#dc2626' : '#10b981';
+    }
+    if (warning) {
+        if (isOver) {
+            const excess = sumInTxnCur - txnAmt;
+            warning.innerHTML = `⚠️ Selected items exceed the transaction amount by <b>${formatCurrencyAmount(excess, txnCurrency)}</b>. Please deselect some items (right-click card).`;
+            warning.style.display = 'block';
+        } else {
+            warning.style.display = 'none';
+        }
+    }
+    if (submitBtn) {
+        submitBtn.disabled = isOver;
+        submitBtn.style.opacity = isOver ? '0.5' : '1';
+        submitBtn.style.cursor = isOver ? 'not-allowed' : 'pointer';
     }
 }
 
@@ -732,22 +838,27 @@ function renderSplitCards(wrap, origAmount, origCurrency) {
         cardsContainer.appendChild(card);
     });
 
-    // Update Remaining Badge
+    // Update Remaining Badge — and disable submit when over-allocated
     const allocatedSum = activeAllocations.reduce((sum, a) => sum + (Number(a.original_allocated_amount) || 0), 0);
     const rem = origAmount - allocatedSum;
     const badge = wrap.querySelector('#fx-remaining-badge');
+    const submitBtn = wrap.querySelector('#btn-submit-fx');
     if (badge) {
         if (Math.abs(rem) < 0.01) {
             badge.className = 'remaining-alloc-indicator complete';
             badge.textContent = `Fully Allocated (${origAmount.toLocaleString()} ${origCurrency})`;
+            if (submitBtn) { submitBtn.disabled = false; submitBtn.style.opacity = '1'; }
         } else if (rem > 0) {
             badge.className = 'remaining-alloc-indicator remaining';
             badge.textContent = `Remaining to allocate: ${rem.toLocaleString()} ${origCurrency}`;
+            if (submitBtn) { submitBtn.disabled = false; submitBtn.style.opacity = '1'; }
         } else {
             badge.className = 'remaining-alloc-indicator';
             badge.style.background = 'rgba(239, 68, 68, 0.15)';
             badge.style.color = '#dc2626';
-            badge.textContent = `Over-allocated by ${Math.abs(rem).toLocaleString()} ${origCurrency}`;
+            badge.textContent = `⚠️ Over-allocated by ${Math.abs(rem).toLocaleString()} ${origCurrency} — reduce a split`;
+            // Disable submit when over-allocated
+            if (submitBtn) { submitBtn.disabled = true; submitBtn.style.opacity = '0.5'; }
         }
     }
 }
@@ -1410,13 +1521,15 @@ function renderInvoicesList() {
         const isPaid = inv.status === 'paid';
         const card = document.createElement('div');
         card.className = 'invoice-card';
+        const amtSym = inv.currency === 'USD' ? '$' : '';
+        const amtSuffix = inv.currency !== 'USD' ? ` ${inv.currency}` : '';
         card.innerHTML = `
             <div>
                 <div class="inv-header">
                     <span class="inv-number">${inv.invoice_number}</span>
-                    <span class="inv-status ${isPaid ? 'paid' : 'pending'}">${isPaid ? 'PAID' : 'PENDING'}</span>
+                    <span class="inv-status ${isPaid ? 'paid' : 'pending'}">${isPaid ? 'PAID ✅' : 'PENDING ⏳'}</span>
                 </div>
-                <div class="inv-amount">${inv.currency === 'USD' ? '$' : ''}${Number(inv.amount).toLocaleString(undefined, {minimumFractionDigits:2})} ${inv.currency !== 'USD' ? inv.currency : ''}</div>
+                <div class="inv-amount">${amtSym}${Number(inv.amount).toLocaleString(undefined, {minimumFractionDigits:2})}${amtSuffix}</div>
                 <div class="inv-customer">Customer: <b>${inv.customer_phone}</b></div>
                 <div class="inv-desc">${inv.description || 'No description provided'}</div>
                 <div style="font-size:11px;color:#94a3b8;">Created: ${new Date(inv.created_at).toLocaleDateString()} ${isPaid && inv.paid_at ? `• Paid: ${new Date(inv.paid_at).toLocaleDateString()}` : ''}</div>
@@ -1435,15 +1548,21 @@ function renderInvoicesList() {
             printSingleInvoice(inv);
         });
 
-        // Mark Paid Action
+        // Mark Paid Action — properly updates source allInvoices array
         const markBtn = card.querySelector('.mark-paid-btn');
         if (markBtn) {
             markBtn.addEventListener('click', async () => {
+                // Update source array first (not just the filtered copy)
+                const sourceInv = allInvoices.find(i => i.id === inv.id);
+                if (sourceInv) {
+                    sourceInv.status = 'paid';
+                    sourceInv.paid_at = new Date().toISOString();
+                }
                 inv.status = 'paid';
                 inv.paid_at = new Date().toISOString();
                 renderInvoicesList();
                 if (typeof window.showToast === 'function') {
-                    window.showToast(`Invoice ${inv.invoice_number} marked as Paid`, 'success');
+                    window.showToast(`Invoice ${inv.invoice_number} marked as Paid ✅`, 'success');
                 }
                 try {
                     const res = await secureFetch(`/api/invoices/${inv.id}/status`, {
@@ -1452,6 +1571,8 @@ function renderInvoicesList() {
                         body: JSON.stringify({ status: 'paid' })
                     });
                     if (!res.ok) {
+                        // Only reload from server on actual failure
+                        console.warn('Invoice status update failed, reloading...');
                         loadInvoices();
                     }
                 } catch(e) {
@@ -1643,23 +1764,41 @@ function renderCatalogGrid() {
     grid.innerHTML = '';
 
     if (!allCatalogItems || allCatalogItems.length === 0) {
-        grid.innerHTML = '<p class="text-muted">No items in catalog yet. Click "+ Add New Item" above to add one.</p>';
+        grid.innerHTML = `
+            <div style="grid-column:1/-1;text-align:center;padding:48px 24px;background:#f8fafc;border:2px dashed #cbd5e1;border-radius:12px;">
+                <p style="font-size:16px;font-weight:700;color:#1e293b;margin:0 0 6px 0;">No items in your catalog yet</p>
+                <p class="text-muted" style="margin:0 0 16px 0;font-size:13px;">You can load a complete Somali restaurant menu with 1 click, or add custom items.</p>
+                <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;">
+                    <button class="btn btn-secondary" onclick="document.getElementById('seed-somali-menu-btn')?.click()" style="background:rgba(99,102,241,0.08);color:#6366f1;border:1px solid rgba(99,102,241,0.25);">🍽️ Load Somali Restaurant Menu</button>
+                    <button class="btn btn-primary" onclick="document.getElementById('add-catalog-item-btn')?.click()">+ Add Custom Item</button>
+                </div>
+            </div>
+        `;
         return;
     }
 
     allCatalogItems.forEach(item => {
+        const itemCurrency = (item.currency || 'USD').toUpperCase();
+        const priceFormatted = formatCurrencyAmount(item.price, itemCurrency);
         const card = document.createElement('div');
         card.className = 'catalog-item-card';
         card.innerHTML = `
             <div class="cic-info">
-                <h4>${item.name}</h4>
+                <h4 id="cic-name-${item.id}">${item.name}</h4>
                 <span class="cic-category">${item.category}</span>
             </div>
-            <div style="display:flex;align-items:center;gap:10px;">
-                <span class="cic-price">$${Number(item.price).toFixed(2)}</span>
+            <div style="display:flex;align-items:center;gap:8px;">
+                <span class="cic-price" id="cic-price-${item.id}">${priceFormatted}</span>
+                <button class="icon-btn edit-item-btn" data-id="${item.id}" style="color:#6366f1;font-size:14px;" title="Edit Item">✏️</button>
                 <button class="icon-btn delete-item-btn" data-id="${item.id}" style="color:#ef4444;" title="Delete Item">🗑️</button>
             </div>
         `;
+
+        // Edit item inline
+        card.querySelector('.edit-item-btn').addEventListener('click', () => {
+            openEditCatalogItem(item);
+        });
+
         card.querySelector('.delete-item-btn').addEventListener('click', async () => {
             if (confirm(`Delete "${item.name}" from catalog?`)) {
                 await secureFetch(`/api/business/items/${item.id}`, { method: 'DELETE' });
@@ -1670,6 +1809,40 @@ function renderCatalogGrid() {
     });
 }
 
+// Opens an edit modal/inline form for catalog item
+function openEditCatalogItem(item) {
+    const modal = document.getElementById('catalog-modal');
+    const form = document.getElementById('catalog-item-form');
+    if (!modal || !form) return;
+
+    // Pre-fill the form
+    const catInput = document.getElementById('cat-category');
+    const nameInput = document.getElementById('cat-name');
+    const priceInput = document.getElementById('cat-price');
+    const curInput = document.getElementById('cat-currency');
+    if (catInput) catInput.value = item.category || '';
+    if (nameInput) nameInput.value = item.name || '';
+    if (priceInput) priceInput.value = item.price || 0;
+    if (curInput) curInput.value = item.currency || 'USD';
+
+    // Change submit button label
+    const submitBtn = form.querySelector('button[type="submit"]');
+    const origLabel = submitBtn ? submitBtn.textContent : 'Add Item';
+    if (submitBtn) submitBtn.textContent = 'Update Item';
+
+    // Store editing item id on form
+    form.dataset.editingId = item.id;
+    modal.classList.remove('hidden');
+
+    // Restore form on close
+    const restoreForm = () => {
+        form.dataset.editingId = '';
+        if (submitBtn) submitBtn.textContent = origLabel;
+    };
+    document.getElementById('catalog-close')?.addEventListener('click', restoreForm, { once: true });
+    document.getElementById('catalog-overlay')?.addEventListener('click', restoreForm, { once: true });
+}
+
 function initCatalogEvents() {
     const addBtn = document.getElementById('add-catalog-item-btn');
     const modal = document.getElementById('catalog-modal');
@@ -1678,13 +1851,28 @@ function initCatalogEvents() {
     const form = document.getElementById('catalog-item-form');
 
     if (addBtn && modal) {
-        addBtn.addEventListener('click', () => modal.classList.remove('hidden'));
+        addBtn.addEventListener('click', () => {
+            // Clear editing state when opening fresh
+            if (form) {
+                form.dataset.editingId = '';
+                form.reset();
+                const submitBtn = form.querySelector('button[type="submit"]');
+                if (submitBtn) submitBtn.textContent = 'Add Item';
+            }
+            modal.classList.remove('hidden');
+        });
     }
     if (closeBtn && modal) {
-        closeBtn.addEventListener('click', () => modal.classList.add('hidden'));
+        closeBtn.addEventListener('click', () => {
+            modal.classList.add('hidden');
+            if (form) { form.dataset.editingId = ''; }
+        });
     }
     if (overlay && modal) {
-        overlay.addEventListener('click', () => modal.classList.add('hidden'));
+        overlay.addEventListener('click', () => {
+            modal.classList.add('hidden');
+            if (form) { form.dataset.editingId = ''; }
+        });
     }
 
     if (form) {
@@ -1694,17 +1882,37 @@ function initCatalogEvents() {
             const name = document.getElementById('cat-name').value.trim();
             const price = parseFloat(document.getElementById('cat-price').value) || 0;
             const currency = document.getElementById('cat-currency').value;
+            const editingId = form.dataset.editingId;
 
-            const res = await secureFetch('/api/business/items', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ category, name, price, currency })
-            });
+            let res;
+            if (editingId) {
+                // Update existing item
+                res = await secureFetch(`/api/business/items/${editingId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ category, name, price, currency })
+                });
+            } else {
+                // Create new item
+                res = await secureFetch('/api/business/items', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ category, name, price, currency })
+                });
+            }
 
             if (res.ok) {
                 modal.classList.add('hidden');
                 form.reset();
-                loadCatalogItems();
+                form.dataset.editingId = '';
+                const submitBtn = form.querySelector('button[type="submit"]');
+                if (submitBtn) submitBtn.textContent = 'Add Item';
+                await loadCatalogItems();
+                if (typeof window.showToast === 'function') {
+                    window.showToast(editingId ? `"${name}" updated successfully ✏️` : `"${name}" added to catalog ✅`, 'success');
+                }
+            } else {
+                alert('Could not save item. Please try again.');
             }
         });
     }
@@ -1746,6 +1954,27 @@ function initCatalogEvents() {
         });
     }
 
+    // Seed Somali Restaurant Menu
+    const seedSomaliBtn = document.getElementById('seed-somali-menu-btn');
+    if (seedSomaliBtn) {
+        seedSomaliBtn.addEventListener('click', async () => {
+            seedSomaliBtn.disabled = true;
+            seedSomaliBtn.textContent = 'Loading Somali Foods...';
+            try {
+                const count = await seedDefaultRestaurantMenu();
+                await loadCatalogItems();
+                if (typeof window.showToast === 'function') {
+                    window.showToast(`${count} Somali food items added to menu! 🍽️`, 'success');
+                }
+            } catch(e) {
+                console.error('Failed to seed Somali menu', e);
+            } finally {
+                seedSomaliBtn.disabled = false;
+                seedSomaliBtn.textContent = '🍽️ Load Somali Menu';
+            }
+        });
+    }
+
     // Save live FX rates from Tab 5
     const saveFxBtn = document.getElementById('save-fx-rates-btn');
     if (saveFxBtn) {
@@ -1768,7 +1997,7 @@ function initCatalogEvents() {
                     window.syncFxWidget();
                 }
                 if (typeof window.showToast === 'function') {
-                    window.showToast('Live exchange rates updated successfully', 'success');
+                    window.showToast('Live exchange rates updated successfully ✅', 'success');
                 }
             }
         });
@@ -1782,7 +2011,16 @@ function initCatalogEvents() {
             const baseCur = document.getElementById('settings-base-currency').value;
             const rateSLSH = parseFloat(document.getElementById('settings-rate-slsh').value) || 11000;
 
-            const ratesJson = JSON.stringify({ USD_TO_SLSH: rateSLSH, USD_TO_ETB: 120 });
+            // Merge with existing ETB rate to avoid overwriting it
+            let existingETB = 120;
+            try {
+                if (window.currentCompany && window.currentCompany.exchange_rates_json) {
+                    const parsed = JSON.parse(window.currentCompany.exchange_rates_json);
+                    if (parsed.USD_TO_ETB) existingETB = parseFloat(parsed.USD_TO_ETB) || 120;
+                }
+            } catch(e) {}
+
+            const ratesJson = JSON.stringify({ USD_TO_SLSH: rateSLSH, USD_TO_ETB: existingETB });
 
             const res = await secureFetch('/api/company/settings', {
                 method: 'PUT',
@@ -1799,7 +2037,7 @@ function initCatalogEvents() {
                 window.currentCompany = data.company;
                 updateBusinessUI(data.company);
                 if (typeof window.showToast === 'function') {
-                    window.showToast('Business settings saved successfully', 'success');
+                    window.showToast('Business settings saved successfully ✅', 'success');
                 }
             }
         });
@@ -1888,4 +2126,54 @@ function initSeedDemoDataButton() {
         });
     }
 }
+// ─── 11. Seed Default Restaurant Menu with Somali Foods ──────────────────────
+async function seedDefaultRestaurantMenu() {
+    const somaliMenuItems = [
+        // ─ Mains ─
+        { category: 'Mains', name: 'Bariis (Somali Rice)', price: 5000, currency: 'SLSH' },
+        { category: 'Mains', name: 'Hilib Ari (Goat Meat)', price: 8000, currency: 'SLSH' },
+        { category: 'Mains', name: 'Hilib Lo\'aad (Beef)', price: 7000, currency: 'SLSH' },
+        { category: 'Mains', name: 'Suugo Spaghetti', price: 4500, currency: 'SLSH' },
+        { category: 'Mains', name: 'Digaag (Chicken)', price: 9000, currency: 'SLSH' },
+        { category: 'Mains', name: 'Muufo (Somali Flatbread)', price: 2000, currency: 'SLSH' },
+        { category: 'Mains', name: 'Baasto & Hilib', price: 6000, currency: 'SLSH' },
+        { category: 'Mains', name: 'Cambuulo (Cowpeas)', price: 3500, currency: 'SLSH' },
+        { category: 'Mains', name: 'Iskukaris (Mixed Rice)', price: 6500, currency: 'SLSH' },
+        // ─ Breakfast ─
+        { category: 'Breakfast', name: 'Canjeero (Somali Pancake)', price: 1500, currency: 'SLSH' },
+        { category: 'Breakfast', name: 'Lahoh', price: 1500, currency: 'SLSH' },
+        { category: 'Breakfast', name: 'Malawax (Sweet Pancake)', price: 2000, currency: 'SLSH' },
+        { category: 'Breakfast', name: 'Sabaayad (Flatbread)', price: 1500, currency: 'SLSH' },
+        { category: 'Breakfast', name: 'Egg & Bread', price: 2500, currency: 'SLSH' },
+        // ─ Starters ─
+        { category: 'Starters', name: 'Sambuus (Samosa)', price: 500, currency: 'SLSH' },
+        { category: 'Starters', name: 'Kac Kac (Crunchy Snack)', price: 1000, currency: 'SLSH' },
+        { category: 'Starters', name: 'Salad', price: 2000, currency: 'SLSH' },
+        // ─ Drinks ─
+        { category: 'Drinks', name: 'Shaah (Somali Tea)', price: 1000, currency: 'SLSH' },
+        { category: 'Drinks', name: 'Caano Geel (Camel Milk)', price: 3000, currency: 'SLSH' },
+        { category: 'Drinks', name: 'Caano Lo\'aad (Cow Milk)', price: 2000, currency: 'SLSH' },
+        { category: 'Drinks', name: 'Juice (Mixed Fruit)', price: 2500, currency: 'SLSH' },
+        { category: 'Drinks', name: 'Water Bottle', price: 500, currency: 'SLSH' },
+        { category: 'Drinks', name: 'Soft Drink (Soda)', price: 1000, currency: 'SLSH' },
+        // ─ Desserts ─
+        { category: 'Desserts', name: 'Xalwo (Somali Halva)', price: 2000, currency: 'SLSH' },
+        { category: 'Desserts', name: 'Basbousa (Semolina Cake)', price: 2000, currency: 'SLSH' },
+        { category: 'Desserts', name: 'Fresh Fruit Plate', price: 3000, currency: 'SLSH' },
+    ];
 
+    let added = 0;
+    for (const item of somaliMenuItems) {
+        try {
+            const res = await secureFetch('/api/business/items', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(item)
+            });
+            if (res.ok) added++;
+        } catch(e) { console.warn('Could not add item', item.name, e); }
+    }
+    return added;
+}
+
+window.seedDefaultRestaurantMenu = seedDefaultRestaurantMenu;
