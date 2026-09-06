@@ -12,6 +12,22 @@ let currentReportRange = 'today';
 let activeAllocations = []; // Used for split currency exchange
 let selectedMenuItems = {}; // { itemId: qty }
 
+// Statement Pagination
+let currentStatementTxns = [];
+let stmtCurrentPage = 1;
+let stmtPerPage = 15;
+let stmtShowAll = false;
+
+// Employee Tracking
+let currentEmployees = [];
+let activeCashierEmployee = null; // name of currently selected cashier
+
+// Import Hub - Spreadsheet
+let parsedSheetRows = [];
+
+// Offline
+let offlineQueue = [];
+
 function secureFetch(url, options = {}) {
     if (typeof window.apiFetch === 'function') {
         return window.apiFetch(url, options);
@@ -31,6 +47,11 @@ document.addEventListener('DOMContentLoaded', () => {
     initProviderCollapsible();
     initFxCalculatorWidget();
     initQuickFilterPresets();
+    initImportHubEvents();
+    initReceiptModalEvents();
+    initEmployeeEvents();
+    initOfflineSyncManager();
+    initStatementPaginationEvents();
 });
 
 // ─── 1. Business Type Selection in Signup ────────────────────────────────────
@@ -124,6 +145,16 @@ function updateBusinessUI(company) {
         if (fxManager) fxManager.classList.add('hidden');
     }
 
+    // Somali Menu Button & Tab: Strictly for Restaurant companies
+    const seedSomaliBtn = document.getElementById('seed-somali-menu-btn');
+    const importSomaliTabBtn = document.getElementById('import-somali-tab-btn');
+    if (seedSomaliBtn) {
+        seedSomaliBtn.style.display = bType === 'restaurant' ? 'inline-block' : 'none';
+    }
+    if (importSomaliTabBtn) {
+        importSomaliTabBtn.style.display = bType === 'restaurant' ? 'flex' : 'none';
+    }
+
     // Settings Dropdowns
     const bTypeSelect = document.getElementById('settings-business-type');
     if (bTypeSelect) bTypeSelect.value = bType;
@@ -140,6 +171,9 @@ function updateBusinessUI(company) {
     loadAnalyticsReport(currentReportRange);
     renderCurrencyBalances();
     renderDashboardProviderCards();
+    if (typeof loadEmployees === 'function') loadEmployees();
+    if (typeof loadEmployeeAttendance === 'function') loadEmployeeAttendance();
+    if (typeof loadEmployeeSalesReport === 'function') loadEmployeeSalesReport();
 }
 
 window.updateBusinessUI = updateBusinessUI;
@@ -150,7 +184,6 @@ function renderCurrencyBalances(currencies) {
     if (!bar) return;
     bar.innerHTML = '';
 
-    // Calculate dynamically from window.allTransactions to guarantee real-time accuracy!
     const txns = window.allTransactions || [];
     const curMap = {
         'USD': { received: 0, sent: 0, net: 0, count: 0 },
@@ -159,7 +192,7 @@ function renderCurrencyBalances(currencies) {
 
     txns.forEach(t => {
         let cur = (t.currency || 'USD').toUpperCase();
-        if (cur === 'SOS') return; // Exclude Somali Shilling
+        if (cur === 'SOS') return;
         const amt = Number(t.amount || 0);
         if (!curMap[cur]) {
             curMap[cur] = { received: 0, sent: 0, net: 0, count: 0 };
@@ -209,77 +242,133 @@ function renderDashboardProviderCards() {
     container.innerHTML = '';
 
     const txns = window.allTransactions || [];
+
+    // Core Providers: ZAAD, eDahab, Soltelco
     const providers = {
-        'eDahab': { received: 0, sent: 0, color: '#f59e0b', currency: 'SLSH' },
-        'ZAAD': { received: 0, sent: 0, color: '#10b981', currency: 'USD' },
-        'EVC Plus': { received: 0, sent: 0, color: '#6366f1', currency: 'USD' },
-        'Sahal': { received: 0, sent: 0, color: '#ec4899', currency: 'SLSH' }
+        'ZAAD': {
+            name: 'ZAAD',
+            color: '#10b981',
+            usd: { received: 0, sent: 0 },
+            slsh: { received: 0, sent: 0 }
+        },
+        'eDahab': {
+            name: 'eDahab',
+            color: '#f59e0b',
+            usd: { received: 0, sent: 0 },
+            slsh: { received: 0, sent: 0 }
+        },
+        'Soltelco': {
+            name: 'Soltelco',
+            color: '#0284c7',
+            usd: { received: 0, sent: 0 },
+            slsh: { received: 0, sent: 0 }
+        }
     };
 
-    let grandReceived = 0;
-    let grandSent = 0;
+    let grandUsdRec = 0, grandUsdSent = 0;
+    let grandSlshRec = 0, grandSlshSent = 0;
 
     txns.forEach(t => {
-        const prov = t.provider || 'Other';
+        let prov = (t.provider || '').toLowerCase();
+        let target = 'ZAAD';
+        if (prov.includes('edahab') || prov.includes('dahab')) target = 'eDahab';
+        else if (prov.includes('soltelco') || prov.includes('somtel')) target = 'Soltelco';
+        else if (prov.includes('zaad') || prov.includes('telesom')) target = 'ZAAD';
+        else target = 'ZAAD'; // default to primary
+
         const amt = Number(t.amount || 0);
-        if (!providers[prov]) {
-            providers[prov] = { received: 0, sent: 0, color: '#8b5cf6', currency: t.currency || 'USD' };
-        }
-        if (t.type === 'Received') {
-            providers[prov].received += amt;
-            grandReceived += amt;
+        const cur = (t.currency || 'USD').toUpperCase();
+        const isRec = t.type === 'Received';
+
+        if (cur === 'SLSH') {
+            if (isRec) {
+                providers[target].slsh.received += amt;
+                grandSlshRec += amt;
+            } else {
+                providers[target].slsh.sent += amt;
+                grandSlshSent += amt;
+            }
         } else {
-            providers[prov].sent += amt;
-            grandSent += amt;
+            if (isRec) {
+                providers[target].usd.received += amt;
+                grandUsdRec += amt;
+            } else {
+                providers[target].usd.sent += amt;
+                grandUsdSent += amt;
+            }
         }
     });
 
-    const grandNet = grandReceived - grandSent;
-
-    // Render individual provider cards
+    // Render individual provider cards with BOTH Dollar ($) and SLSH Balances!
     for (const [pName, pData] of Object.entries(providers)) {
-        const net = pData.received - pData.sent;
-        const cur = pData.currency;
-        const sym = cur === 'USD' ? '$' : '';
-        const curSuffix = cur !== 'USD' ? ` ${cur}` : '';
+        const usdNet = pData.usd.received - pData.usd.sent;
+        const slshNet = pData.slsh.received - pData.slsh.sent;
 
         const card = document.createElement('div');
         card.className = 'provider-balance-card';
         card.innerHTML = `
-            <div class="pbc-header">
-                <span class="pbc-title">
+            <div class="pbc-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                <span class="pbc-title" style="font-size:14px;font-weight:800;display:flex;align-items:center;gap:6px;">
                     <span class="pbc-dot" style="background:${pData.color};"></span>
                     ${pName}
                 </span>
-                <span style="font-size:11px;font-weight:700;color:#64748b;">${cur}</span>
+                <span style="font-size:10px;font-weight:800;color:#6366f1;background:rgba(99,102,241,0.08);padding:2px 6px;border-radius:4px;">DUAL WALLET</span>
             </div>
-            <div class="pbc-net ${net >= 0 ? 'text-success' : 'text-danger'}">
-                ${net >= 0 ? '+' : ''}${sym}${net.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}${curSuffix}
+            
+            <!-- USD Account -->
+            <div class="provider-dual-balance-row">
+                <span class="cur-label">💵 USD ($)</span>
+                <span class="cur-val ${usdNet >= 0 ? 'text-success' : 'text-danger'}">
+                    ${usdNet >= 0 ? '+' : ''}$${usdNet.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}
+                </span>
             </div>
-            <div class="pbc-flows">
-                <span class="text-success">+${pData.received.toLocaleString(undefined, {maximumFractionDigits:1})} In</span>
-                <span class="text-danger">-${pData.sent.toLocaleString(undefined, {maximumFractionDigits:1})} Out</span>
+            <div style="display:flex;justify-content:space-between;font-size:10px;color:#64748b;padding:0 8px 4px 8px;">
+                <span class="text-success">+${pData.usd.received.toLocaleString(undefined, {maximumFractionDigits:1})} in</span>
+                <span class="text-danger">-${pData.usd.sent.toLocaleString(undefined, {maximumFractionDigits:1})} out</span>
+            </div>
+
+            <!-- SLSH Account -->
+            <div class="provider-dual-balance-row" style="margin-top:4px;">
+                <span class="cur-label">🪙 SLSH</span>
+                <span class="cur-val ${slshNet >= 0 ? 'text-success' : 'text-danger'}">
+                    ${slshNet >= 0 ? '+' : ''}${Math.round(slshNet).toLocaleString()} SLSH
+                </span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:10px;color:#64748b;padding:0 8px;">
+                <span class="text-success">+${pData.slsh.received.toLocaleString(undefined, {maximumFractionDigits:0})} in</span>
+                <span class="text-danger">-${pData.slsh.sent.toLocaleString(undefined, {maximumFractionDigits:0})} out</span>
             </div>
         `;
         container.appendChild(card);
     }
 
-    // Render Consolidated Total Card
+    // Render Consolidated Total Card with both currencies
+    const totalUsdNet = grandUsdRec - grandUsdSent;
+    const totalSlshNet = grandSlshRec - grandSlshSent;
+
     const totalCard = document.createElement('div');
     totalCard.className = 'provider-balance-card total-card';
     totalCard.innerHTML = `
-        <div class="pbc-header">
-            <span class="pbc-title" style="color:#0f172a;font-weight:800;">
+        <div class="pbc-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <span class="pbc-title" style="color:#0f172a;font-weight:800;font-size:14px;">
                 Total Consolidated
             </span>
-            <span style="font-size:10px;font-weight:800;color:#6366f1;background:rgba(99,102,241,0.1);padding:2px 6px;border-radius:4px;">ALL WALLETS</span>
+            <span style="font-size:10px;font-weight:800;color:#059669;background:rgba(16,185,129,0.1);padding:2px 6px;border-radius:4px;">ALL PROVIDERS</span>
         </div>
-        <div class="pbc-net ${grandNet >= 0 ? 'text-success' : 'text-danger'}" style="font-size:20px;">
-            ${grandNet >= 0 ? '+' : ''}${grandNet.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}
+        <div class="provider-dual-balance-row">
+            <span class="cur-label">💵 Total USD Net</span>
+            <span class="cur-val ${totalUsdNet >= 0 ? 'text-success' : 'text-danger'}">
+                ${totalUsdNet >= 0 ? '+' : ''}$${totalUsdNet.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}
+            </span>
         </div>
-        <div class="pbc-flows">
-            <span class="text-success">+${grandReceived.toLocaleString(undefined, {maximumFractionDigits:0})} Total In</span>
-            <span class="text-danger">-${grandSent.toLocaleString(undefined, {maximumFractionDigits:0})} Total Out</span>
+        <div class="provider-dual-balance-row" style="margin-top:4px;">
+            <span class="cur-label">🪙 Total SLSH Net</span>
+            <span class="cur-val ${totalSlshNet >= 0 ? 'text-success' : 'text-danger'}">
+                ${totalSlshNet >= 0 ? '+' : ''}${Math.round(totalSlshNet).toLocaleString()} SLSH
+            </span>
+        </div>
+        <div style="margin-top:8px;font-size:11px;font-weight:700;color:#64748b;text-align:right;">
+            ZAAD • eDahab • Soltelco
         </div>
     `;
     container.appendChild(totalCard);
@@ -948,23 +1037,29 @@ function renderFastCategoryWorkflow(container, txn, presets) {
 
 // ─── 4D. Submit Classification API Call (Super Fast & Optimistic) ────────────
 async function submitClassification(txnId, category, allocations) {
-    // 1. Optimistic UI update: immediately close modal
+    // 1. Determine active employee / cashier
+    const employeeName = activeCashierEmployee || (currentEmployees && currentEmployees.length > 0 ? currentEmployees[0].name : 'Cashier');
+
+    // 2. Optimistic UI update: immediately close modal
     closeClassifyModal();
 
-    // 2. Immediate feedback toast
+    // 3. Immediate feedback toast
     if (typeof window.showToast === 'function') {
-        window.showToast(`Transaction classified as ${category}`, 'success');
+        window.showToast(`Transaction classified as ${category} (${employeeName})`, 'success');
     }
 
-    // 3. Update local in-memory transaction and re-render DOM instantly
+    // 4. Update local in-memory transaction and re-render DOM instantly
+    let localTxn = null;
     if (window.allTransactions) {
-        const localTxn = window.allTransactions.find(t => t.id == txnId);
+        localTxn = window.allTransactions.find(t => t.id == txnId);
         if (localTxn) {
             localTxn.category = category;
             localTxn.is_classified = 1;
             localTxn.classification_data = JSON.stringify({
                 category: category,
                 allocations_count: allocations.length,
+                items: allocations,
+                classified_by: employeeName,
                 classified_at: new Date().toISOString()
             });
             if (typeof window.applyFilters === 'function') {
@@ -976,7 +1071,34 @@ async function submitClassification(txnId, category, allocations) {
         }
     }
 
-    // 4. Send network request asynchronously in background
+    // 5. Automatic Receipt Prompt: Automatically display official receipt whenever transaction is completed
+    if (localTxn && typeof openReceiptModal === 'function') {
+        setTimeout(() => {
+            openReceiptModal(localTxn);
+        }, 300);
+    }
+
+    // 6. If Offline: queue action locally for sync when internet returns
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        if (typeof queueOfflineAction === 'function') {
+            queueOfflineAction({
+                type: 'classify',
+                txnId: txnId,
+                payload: {
+                    category: category,
+                    allocations: allocations,
+                    notes: `Classified (${category})`,
+                    employee_name: employeeName
+                }
+            });
+        }
+        if (typeof window.showToast === 'function') {
+            window.showToast('Saved offline. Will auto-sync when connected 🌐', 'info');
+        }
+        return;
+    }
+
+    // 7. Send network request asynchronously in background
     try {
         const res = await secureFetch(`/api/transactions/${txnId}/classify`, {
             method: 'POST',
@@ -984,7 +1106,8 @@ async function submitClassification(txnId, category, allocations) {
             body: JSON.stringify({
                 category: category,
                 allocations: allocations,
-                notes: `Classified (${category})`
+                notes: `Classified (${category})`,
+                employee_name: employeeName
             })
         });
 
@@ -995,9 +1118,24 @@ async function submitClassification(txnId, category, allocations) {
             }
         } else {
             loadAnalyticsReport(currentReportRange);
+            if (typeof loadEmployeeSalesReport === 'function') {
+                loadEmployeeSalesReport();
+            }
         }
     } catch (e) {
-        console.error('Classification error', e);
+        console.error('Classification error (queuing offline)', e);
+        if (typeof queueOfflineAction === 'function') {
+            queueOfflineAction({
+                type: 'classify',
+                txnId: txnId,
+                payload: {
+                    category: category,
+                    allocations: allocations,
+                    notes: `Classified (${category})`,
+                    employee_name: employeeName
+                }
+            });
+        }
     }
 }
 
@@ -1043,6 +1181,57 @@ function initReportTimePills() {
     if (exportExcelBtn) {
         exportExcelBtn.addEventListener('click', async () => {
             try {
+                if (typeof window.showToast === 'function') {
+                    window.showToast('Generating Excel spreadsheet...', 'success');
+                }
+
+                // If SheetJS is loaded and we have current statement transactions, export directly with full fidelity
+                if (typeof XLSX !== 'undefined' && Array.isArray(currentStatementTxns) && currentStatementTxns.length > 0) {
+                    const rows = currentStatementTxns.map(t => {
+                        let cashierName = 'Owner / General';
+                        if (t.employee_name) {
+                            cashierName = t.employee_name;
+                        } else if (t.metadata && t.metadata.employee_name) {
+                            cashierName = t.metadata.employee_name;
+                        } else if (t.notes && t.notes.includes('Staff:')) {
+                            cashierName = t.notes.split('Staff:')[1].split('|')[0].trim();
+                        }
+
+                        let itemsSold = '';
+                        if (Array.isArray(t.allocations) && t.allocations.length > 0) {
+                            itemsSold = t.allocations.map(a => `${a.item_name || a.category || 'Item'} (x${a.quantity || 1} - $${(a.allocated_amount || 0).toFixed(2)})`).join('; ');
+                        } else if (t.notes && t.notes.includes('Items:')) {
+                            itemsSold = t.notes.split('Items:')[1].split('|')[0].trim();
+                        }
+
+                        return {
+                            "Date & Time": t.timestamp ? new Date(t.timestamp).toLocaleString() : '',
+                            "Provider": t.provider || 'ZAAD',
+                            "Type": t.type || 'Received',
+                            "Amount": Number(t.amount || 0),
+                            "Currency": t.currency || 'USD',
+                            "Customer / Phone": t.sender || t.receiver || 'Direct',
+                            "Category": t.category || 'Unclassified',
+                            "Cashier / Staff": cashierName,
+                            "Items Breakdown": itemsSold || 'N/A',
+                            "Transaction ID": t.transaction_id || '',
+                            "Notes": t.notes || ''
+                        };
+                    });
+
+                    const ws = XLSX.utils.json_to_sheet(rows);
+                    const wb = XLSX.utils.book_new();
+                    XLSX.utils.book_append_sheet(wb, ws, "Statement");
+                    const fileName = `Financial_Statement_${currentReportRange || 'all'}_${new Date().toISOString().slice(0,10)}.xlsx`;
+                    XLSX.writeFile(wb, fileName);
+
+                    if (typeof window.showToast === 'function') {
+                        window.showToast('Excel report downloaded with items & staff! 📊', 'success');
+                    }
+                    return;
+                }
+
+                // Fallback to server endpoint
                 let url = '/api/export/excel';
                 const now = new Date();
                 if (currentReportRange === 'today') {
@@ -1061,10 +1250,6 @@ function initReportTimePills() {
                     const s = document.getElementById('rep-start-date').value;
                     const e = document.getElementById('rep-end-date').value;
                     if (s && e) url += `?start_date=${s}&end_date=${e}`;
-                }
-
-                if (typeof window.showToast === 'function') {
-                    window.showToast('Generating Excel spreadsheet...', 'success');
                 }
 
                 const res = await secureFetch(url);
@@ -1203,8 +1388,8 @@ function renderReportDashboard(report, rangeLabel) {
         const providerColors = {
             'eDahab': '#f59e0b',
             'ZAAD': '#10b981',
-            'EVC Plus': '#6366f1',
-            'Sahal': '#ec4899',
+            'Soltelco': '#0284c7',
+            'Other': '#94a3b8'
         };
 
         if (providers.length === 0) {
@@ -1251,33 +1436,9 @@ function renderReportDashboard(report, rangeLabel) {
         }
     }
 
-    // ─── Statement Transactions Breakdown ─────────────────────────────────────
-    const txnsTbody = document.getElementById('statement-txns-tbody');
-    if (txnsTbody) {
-        txnsTbody.innerHTML = '';
-        const preview = report.transactions_preview || [];
-        if (preview.length === 0) {
-            txnsTbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#64748b;">No transactions recorded in this period.</td></tr>';
-        } else {
-            preview.slice(0, 15).forEach(t => {
-                const dateStr = new Date(t.timestamp).toLocaleString('en-US', {
-                    month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
-                });
-                const isRec = t.type === 'Received';
-                const party = isRec ? (t.sender || 'Customer') : (t.receiver || 'Recipient');
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td>${dateStr}</td>
-                    <td><span style="font-weight:700;color:${isRec ? '#10b981' : '#ef4444'};">${t.type}</span></td>
-                    <td><b>${t.provider || '-'}</b></td>
-                    <td>${party}</td>
-                    <td>${t.category || 'General'}</td>
-                    <td style="font-weight:700;color:${isRec ? '#10b981' : '#ef4444'};">${isRec ? '+' : '-'}${Number(t.amount).toLocaleString(undefined, {minimumFractionDigits:2})} ${t.currency}</td>
-                `;
-                txnsTbody.appendChild(tr);
-            });
-        }
-    }
+    // ─── Statement Transactions Breakdown & Pagination ────────────────────────
+    currentStatementTxns = report.transactions_preview || [];
+    renderStatementTransactions();
 
     // Statement Meta
     const compEl = document.getElementById('stmt-company-name');
@@ -1439,8 +1600,7 @@ function renderProviderCanvasChart(breakdown) {
     const providerColors = {
         'eDahab': '#f59e0b',
         'ZAAD': '#10b981',
-        'EVC Plus': '#6366f1',
-        'Sahal': '#ec4899',
+        'Soltelco': '#0284c7',
         'Other': '#94a3b8'
     };
 
@@ -2177,3 +2337,948 @@ async function seedDefaultRestaurantMenu() {
 }
 
 window.seedDefaultRestaurantMenu = seedDefaultRestaurantMenu;
+
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/* FEATURE 1: Statement Pagination & Item Breakdowns                          */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+
+function renderStatementTransactions() {
+    const txnsTbody = document.getElementById('statement-txns-tbody');
+    const pageInfo  = document.getElementById('statement-page-info');
+    const prevBtn   = document.getElementById('statement-prev-btn');
+    const nextBtn   = document.getElementById('statement-next-btn');
+    const pageNum   = document.getElementById('statement-page-num');
+    const showAllBtn = document.getElementById('statement-show-all-btn');
+
+    if (!txnsTbody) return;
+    txnsTbody.innerHTML = '';
+
+    const total = currentStatementTxns.length;
+    let visible;
+    if (stmtShowAll) {
+        visible = currentStatementTxns;
+        if (pageInfo) pageInfo.textContent = `Showing all ${total} transactions`;
+        if (prevBtn) prevBtn.disabled = true;
+        if (nextBtn) nextBtn.disabled = true;
+        if (pageNum) pageNum.textContent = '—';
+        if (showAllBtn) showAllBtn.textContent = 'Paginate';
+    } else {
+        const totalPages = Math.max(1, Math.ceil(total / stmtPerPage));
+        stmtCurrentPage = Math.min(stmtCurrentPage, totalPages);
+        const start = (stmtCurrentPage - 1) * stmtPerPage;
+        const end   = Math.min(start + stmtPerPage, total);
+        visible = currentStatementTxns.slice(start, end);
+        if (pageInfo) pageInfo.textContent = `Showing ${total === 0 ? 0 : start + 1}–${end} of ${total} transactions`;
+        if (prevBtn) prevBtn.disabled = stmtCurrentPage <= 1;
+        if (nextBtn) nextBtn.disabled = stmtCurrentPage >= totalPages;
+        if (pageNum) pageNum.textContent = `${stmtCurrentPage} / ${totalPages}`;
+        if (showAllBtn) showAllBtn.textContent = `View All ${total}`;
+    }
+
+    if (visible.length === 0) {
+        txnsTbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#64748b;padding:20px;">No transactions recorded in this period.</td></tr>';
+        return;
+    }
+
+    visible.forEach(t => {
+        const dateStr = new Date(t.timestamp).toLocaleString('en-US', {
+            month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+        });
+        const isRec  = t.type === 'Received';
+        const party  = isRec ? (t.sender || 'Customer') : (t.receiver || 'Recipient');
+
+        // Items breakdown
+        let itemsHtml = '<span style="color:#94a3b8;font-size:11px;">—</span>';
+        try {
+            const classData = typeof t.classification_data === 'string'
+                ? JSON.parse(t.classification_data) : (t.classification_data || {});
+            if (classData.items && classData.items.length > 0) {
+                const names = classData.items.slice(0, 3).map(i => i.item_name || i.allocation_type || '?');
+                itemsHtml = `<span style="font-size:11px;color:#334155;">${names.join(', ')}${classData.items.length > 3 ? ' …' : ''}</span>`;
+            } else if (classData.classified_by) {
+                itemsHtml = `<span style="font-size:11px;color:#64748b;">👤 ${classData.classified_by}</span>`;
+            }
+        } catch(e) {}
+
+        const tr = document.createElement('tr');
+        tr.style.cursor = 'pointer';
+        tr.title = 'Click to view receipt';
+        tr.innerHTML = `
+            <td>${dateStr}</td>
+            <td><span style="font-weight:700;color:${isRec ? '#10b981' : '#ef4444'};">${t.type}</span></td>
+            <td><b>${t.provider || '-'}</b></td>
+            <td>${party}</td>
+            <td>${t.category || 'General'}</td>
+            <td>${itemsHtml}</td>
+            <td style="font-weight:700;color:${isRec ? '#10b981' : '#ef4444'};">${isRec ? '+' : '-'}${Number(t.amount).toLocaleString(undefined, {minimumFractionDigits:2})} ${t.currency}</td>
+            <td style="text-align:center;">
+                <button class="btn btn-text btn-sm stmt-receipt-btn" data-txnid="${t.id}" style="color:#6366f1;font-size:11px;font-weight:700;padding:2px 6px;" type="button">🧾</button>
+            </td>
+        `;
+        tr.querySelector('.stmt-receipt-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (typeof openReceiptModal === 'function') openReceiptModal(t);
+        });
+        tr.addEventListener('click', () => {
+            if (typeof openReceiptModal === 'function') openReceiptModal(t);
+        });
+        txnsTbody.appendChild(tr);
+    });
+}
+
+function initStatementPaginationEvents() {
+    const prevBtn    = document.getElementById('statement-prev-btn');
+    const nextBtn    = document.getElementById('statement-next-btn');
+    const showAllBtn = document.getElementById('statement-show-all-btn');
+
+    if (prevBtn) {
+        prevBtn.addEventListener('click', () => {
+            if (stmtCurrentPage > 1) { stmtCurrentPage--; renderStatementTransactions(); }
+        });
+    }
+    if (nextBtn) {
+        nextBtn.addEventListener('click', () => {
+            const total = currentStatementTxns.length;
+            const totalPages = Math.ceil(total / stmtPerPage);
+            if (stmtCurrentPage < totalPages) { stmtCurrentPage++; renderStatementTransactions(); }
+        });
+    }
+    if (showAllBtn) {
+        showAllBtn.addEventListener('click', () => {
+            stmtShowAll = !stmtShowAll;
+            stmtCurrentPage = 1;
+            renderStatementTransactions();
+        });
+    }
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/* FEATURE 2: Import Hub Events (Scan / Spreadsheet / Manual / Somali Menu)  */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+
+function initImportHubEvents() {
+    const openBtn   = document.getElementById('open-import-hub-btn');
+    const modal     = document.getElementById('import-items-modal');
+    const closeBtn  = document.getElementById('import-close-btn');
+    const overlay   = document.getElementById('import-overlay');
+    const methodBtns = document.querySelectorAll('.import-method-card');
+
+    if (!modal) return;
+    if (openBtn) openBtn.addEventListener('click', () => modal.classList.remove('hidden'));
+    if (closeBtn) closeBtn.addEventListener('click', () => modal.classList.add('hidden'));
+    if (overlay)  overlay.addEventListener('click', () => modal.classList.add('hidden'));
+
+    // Tab switching
+    methodBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            methodBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            const method = btn.dataset.method;
+            document.querySelectorAll('.import-panel').forEach(p => p.classList.add('hidden'));
+            const panel = document.getElementById(`import-panel-${method}`);
+            if (panel) panel.classList.remove('hidden');
+        });
+    });
+
+    // ── Scan Menu Tab ─────────────────────────────────────────────────────────
+    const triggerScanBtn = document.getElementById('trigger-scan-btn');
+    const scanInput      = document.getElementById('scan-menu-input');
+    const scanPreviewContainer = document.getElementById('scan-preview-container');
+    const scanPreviewImg       = document.getElementById('scan-preview-img');
+    const runOcrBtn            = document.getElementById('run-ocr-btn');
+    const scanResultsContainer = document.getElementById('scan-results-container');
+    const scanCountBadge       = document.getElementById('scan-count-badge');
+    const scanItemsTbody       = document.getElementById('scan-items-tbody');
+    const addScanRowBtn        = document.getElementById('add-scan-row-btn');
+    const confirmScanBtn       = document.getElementById('confirm-scan-import-btn');
+
+    if (triggerScanBtn && scanInput) {
+        triggerScanBtn.addEventListener('click', () => scanInput.click());
+    }
+    if (scanInput) {
+        scanInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const url = URL.createObjectURL(file);
+            if (scanPreviewImg) scanPreviewImg.src = url;
+            if (scanPreviewContainer) scanPreviewContainer.classList.remove('hidden');
+        });
+    }
+    if (runOcrBtn) {
+        runOcrBtn.addEventListener('click', async () => {
+            runOcrBtn.textContent = '⚡ Extracting…';
+            runOcrBtn.disabled = true;
+            // Simple regex-based text extraction simulation (no external API needed)
+            // In production, this would call a Vision API or server OCR endpoint
+            const sampleItems = extractMenuItemsFromImageHint();
+            renderScanPreviewTable(sampleItems, scanItemsTbody, scanCountBadge, scanResultsContainer);
+            runOcrBtn.textContent = '⚡ Extract Items & Prices';
+            runOcrBtn.disabled = false;
+        });
+    }
+    if (addScanRowBtn && scanItemsTbody) {
+        addScanRowBtn.addEventListener('click', () => {
+            addScanTableRow(scanItemsTbody);
+            if (scanCountBadge) {
+                const count = scanItemsTbody.querySelectorAll('tr').length;
+                scanCountBadge.textContent = `Detected Items (${count})`;
+            }
+        });
+    }
+    if (confirmScanBtn) {
+        confirmScanBtn.addEventListener('click', async () => {
+            const items = collectScanTableItems(scanItemsTbody);
+            if (items.length === 0) { alert('No items to import.'); return; }
+            await bulkImportItems(items, confirmScanBtn, modal);
+        });
+    }
+
+    // ── Spreadsheet Tab ───────────────────────────────────────────────────────
+    const triggerSheetBtn  = document.getElementById('trigger-sheet-btn');
+    const sheetInput       = document.getElementById('spreadsheet-file-input');
+    const sheetFilename    = document.getElementById('sheet-filename');
+    const sheetMappingRow  = document.getElementById('sheet-mapping-row');
+    const sheetPreviewContainer = document.getElementById('sheet-preview-container');
+    const sheetCountBadge  = document.getElementById('sheet-count-badge');
+    const sheetItemsTbody  = document.getElementById('sheet-items-tbody');
+    const confirmSheetBtn  = document.getElementById('confirm-sheet-import-btn');
+
+    const colSelectors = ['map-col-name', 'map-col-price', 'map-col-category', 'map-col-sku'];
+
+    if (triggerSheetBtn && sheetInput) {
+        triggerSheetBtn.addEventListener('click', () => sheetInput.click());
+    }
+    if (sheetInput) {
+        sheetInput.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            if (sheetFilename) sheetFilename.textContent = file.name;
+            try {
+                parsedSheetRows = await parseSpreadsheet(file);
+                if (parsedSheetRows.length === 0) { alert('No rows found in the file.'); return; }
+                const headers = Object.keys(parsedSheetRows[0] || {});
+                colSelectors.forEach(selId => {
+                    const sel = document.getElementById(selId);
+                    if (!sel) return;
+                    sel.innerHTML = '<option value="">(none)</option>' + headers.map(h => `<option value="${h}">${h}</option>`).join('');
+                    // Auto-detect
+                    const autoMatch = { 'map-col-name': /name|item|product/i, 'map-col-price': /price|cost|amount/i, 'map-col-category': /categ|type|group/i, 'map-col-sku': /sku|code|barcode/i };
+                    const pattern = autoMatch[selId];
+                    if (pattern) {
+                        const matched = headers.find(h => pattern.test(h));
+                        if (matched) sel.value = matched;
+                    }
+                });
+                if (sheetMappingRow) sheetMappingRow.classList.remove('hidden');
+                renderSheetPreview(parsedSheetRows, sheetItemsTbody, sheetCountBadge, sheetPreviewContainer);
+            } catch(err) {
+                console.error('Spreadsheet parse error', err);
+                alert('Could not read file. Make sure it is a valid .xlsx or .csv file.');
+            }
+        });
+    }
+
+    // Re-render preview on column mapping change
+    colSelectors.forEach(selId => {
+        const sel = document.getElementById(selId);
+        if (sel) sel.addEventListener('change', () => renderSheetPreview(parsedSheetRows, sheetItemsTbody, sheetCountBadge, sheetPreviewContainer));
+    });
+
+    if (confirmSheetBtn) {
+        confirmSheetBtn.addEventListener('click', async () => {
+            const nameCol     = document.getElementById('map-col-name')?.value;
+            const priceCol    = document.getElementById('map-col-price')?.value;
+            const categoryCol = document.getElementById('map-col-category')?.value;
+            const skuCol      = document.getElementById('map-col-sku')?.value;
+
+            const items = parsedSheetRows.map(row => ({
+                name:     String(row[nameCol] || '').trim(),
+                price:    parseFloat(row[priceCol]) || 0,
+                category: String(row[categoryCol] || 'General').trim(),
+                sku:      skuCol ? String(row[skuCol] || '').trim() : '',
+                currency: 'SLSH'
+            })).filter(i => i.name);
+
+            if (items.length === 0) { alert('No valid rows with item names.'); return; }
+            await bulkImportItems(items, confirmSheetBtn, modal);
+        });
+    }
+
+    // ── Manual Tab ────────────────────────────────────────────────────────────
+    const manualForm = document.getElementById('quick-manual-item-form');
+    if (manualForm) {
+        manualForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const item = {
+                name:     document.getElementById('qman-name').value.trim(),
+                category: document.getElementById('qman-category').value.trim(),
+                price:    parseFloat(document.getElementById('qman-price').value) || 0,
+                currency: document.getElementById('qman-currency').value || 'SLSH',
+                sku:      document.getElementById('qman-sku').value.trim(),
+                description: document.getElementById('qman-desc').value.trim()
+            };
+            const res = await secureFetch('/api/business/items', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(item)
+            });
+            if (res.ok) {
+                if (typeof window.showToast === 'function') window.showToast(`✅ "${item.name}" added to catalog!`, 'success');
+                manualForm.reset();
+                loadCatalogItems();
+            } else {
+                alert('Failed to add item. Please try again.');
+            }
+        });
+    }
+
+    // ── Somali Menu Tab ───────────────────────────────────────────────────────
+    const confirmSomaliBtn = document.getElementById('import-somali-preset-confirm-btn');
+    if (confirmSomaliBtn) {
+        confirmSomaliBtn.addEventListener('click', async () => {
+            confirmSomaliBtn.disabled = true;
+            confirmSomaliBtn.textContent = '⏳ Loading Menu…';
+            try {
+                const added = await seedDefaultRestaurantMenu();
+                if (typeof window.showToast === 'function') {
+                    window.showToast(`🍽️ Somali Menu loaded — ${added} items added!`, 'success');
+                }
+                modal.classList.add('hidden');
+                loadCatalogItems();
+            } finally {
+                confirmSomaliBtn.disabled = false;
+                confirmSomaliBtn.textContent = '🍽️ Load Full Somali Restaurant Menu';
+            }
+        });
+    }
+}
+
+function extractMenuItemsFromImageHint() {
+    // Placeholder — returns sample items for the OCR preview table
+    // In production, this would send the image to a Vision AI API
+    return [
+        { name: 'Item 1', category: 'Main', price: 0, currency: 'SLSH' },
+        { name: 'Item 2', category: 'Drinks', price: 0, currency: 'SLSH' },
+    ];
+}
+
+function addScanTableRow(tbody, data = {}) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+        <td><input type="text" class="custom-input scan-item-name" value="${data.name || ''}" placeholder="Item name" style="font-size:11px;padding:4px 6px;"></td>
+        <td><input type="text" class="custom-input scan-item-cat" value="${data.category || 'General'}" placeholder="Category" style="font-size:11px;padding:4px 6px;"></td>
+        <td><input type="number" class="custom-input scan-item-price" value="${data.price || 0}" min="0" step="any" style="font-size:11px;padding:4px 6px;width:80px;"></td>
+        <td><select class="custom-select scan-item-cur" style="font-size:11px;padding:4px 6px;"><option value="SLSH">SLSH</option><option value="USD">USD</option></select></td>
+        <td><button type="button" style="color:#ef4444;background:none;border:none;cursor:pointer;font-size:14px;" onclick="this.closest('tr').remove()">✕</button></td>
+    `;
+    tbody.appendChild(tr);
+}
+
+function renderScanPreviewTable(items, tbody, badge, container) {
+    if (!tbody) return;
+    tbody.innerHTML = '';
+    items.forEach(item => addScanTableRow(tbody, item));
+    if (badge) badge.textContent = `Detected Items (${items.length})`;
+    if (container) container.classList.remove('hidden');
+}
+
+function collectScanTableItems(tbody) {
+    if (!tbody) return [];
+    return Array.from(tbody.querySelectorAll('tr')).map(tr => ({
+        name:     tr.querySelector('.scan-item-name')?.value.trim() || '',
+        category: tr.querySelector('.scan-item-cat')?.value.trim() || 'General',
+        price:    parseFloat(tr.querySelector('.scan-item-price')?.value) || 0,
+        currency: tr.querySelector('.scan-item-cur')?.value || 'SLSH'
+    })).filter(i => i.name);
+}
+
+async function parseSpreadsheet(file) {
+    return new Promise((resolve, reject) => {
+        if (typeof XLSX === 'undefined') {
+            // Fallback: CSV parsing
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const lines = e.target.result.split('\n').map(l => l.trim()).filter(Boolean);
+                if (lines.length < 2) { resolve([]); return; }
+                const headers = lines[0].split(',').map(h => h.replace(/"/g, '').trim());
+                const rows = lines.slice(1).map(line => {
+                    const cols = line.split(',').map(c => c.replace(/"/g, '').trim());
+                    const obj = {};
+                    headers.forEach((h, i) => obj[h] = cols[i] || '');
+                    return obj;
+                });
+                resolve(rows);
+            };
+            reader.onerror = reject;
+            reader.readAsText(file);
+        } else {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const workbook = XLSX.read(e.target.result, { type: 'binary' });
+                    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                    const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+                    resolve(rows);
+                } catch(err) { reject(err); }
+            };
+            reader.onerror = reject;
+            reader.readAsBinaryString(file);
+        }
+    });
+}
+
+function renderSheetPreview(rows, tbody, badge, container) {
+    if (!tbody) return;
+    const nameCol     = document.getElementById('map-col-name')?.value;
+    const priceCol    = document.getElementById('map-col-price')?.value;
+    const categoryCol = document.getElementById('map-col-category')?.value;
+    const skuCol      = document.getElementById('map-col-sku')?.value;
+
+    tbody.innerHTML = '';
+    const preview = rows.slice(0, 20);
+    preview.forEach(row => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>${row[nameCol] || '—'}</td>
+            <td>${row[categoryCol] || '—'}</td>
+            <td>${row[priceCol] || '—'}</td>
+            <td>${skuCol ? (row[skuCol] || '—') : '—'}</td>
+        `;
+        tbody.appendChild(tr);
+    });
+    if (badge) badge.textContent = `Items to Import (${rows.length})`;
+    if (container) container.classList.remove('hidden');
+}
+
+async function bulkImportItems(items, btn, modal) {
+    const origText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = `⏳ Importing ${items.length} items…`;
+    try {
+        const res = await secureFetch('/api/business/items/bulk', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ items })
+        });
+        if (res.ok) {
+            const data = await res.json();
+            if (typeof window.showToast === 'function') {
+                window.showToast(`✅ ${data.inserted || items.length} items imported successfully!`, 'success');
+            }
+            if (modal) modal.classList.add('hidden');
+            loadCatalogItems();
+        } else {
+            alert('Import failed. Please try again.');
+        }
+    } catch(e) {
+        console.error('Bulk import error', e);
+        alert('Network error during import.');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = origText;
+    }
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/* FEATURE 3: Automatic POS Thermal Receipt Modal                             */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+
+function openReceiptModal(txn) {
+    if (!txn) return;
+    const modal = document.getElementById('receipt-modal');
+    const slip  = document.getElementById('thermal-receipt-slip');
+    if (!modal || !slip) return;
+
+    const company   = window.currentCompany || {};
+    const dateStr   = new Date(txn.timestamp || Date.now()).toLocaleString('en-US', {
+        year: 'numeric', month: 'short', day: 'numeric',
+        hour: '2-digit', minute: '2-digit'
+    });
+    const isRec   = txn.type === 'Received';
+    const party   = isRec ? (txn.sender || 'Customer') : (txn.receiver || 'Recipient');
+    const receiptNo = `RCP-${String(txn.id || Date.now()).slice(-6)}`;
+
+    // Parse items from classification_data
+    let itemsRows = '';
+    let classBy = 'Staff';
+    try {
+        const cd = typeof txn.classification_data === 'string'
+            ? JSON.parse(txn.classification_data) : (txn.classification_data || {});
+        classBy = cd.classified_by || classBy;
+        if (cd.items && cd.items.length > 0) {
+            itemsRows = cd.items.map(item => `
+                <tr>
+                    <td style="padding:2px 4px;">${item.item_name || item.allocation_type || '—'}</td>
+                    <td style="padding:2px 4px;text-align:center;">${item.item_quantity || 1}</td>
+                    <td style="padding:2px 4px;text-align:right;font-weight:700;">${item.converted_amount ? `${Number(item.converted_amount).toLocaleString()} ${item.target_currency || ''}` : '—'}</td>
+                </tr>
+            `).join('');
+        }
+    } catch(e) {}
+
+    if (!itemsRows) {
+        itemsRows = `<tr><td colspan="3" style="padding:4px;color:#888;font-size:11px;">${txn.category || 'Payment'}</td></tr>`;
+    }
+
+    slip.innerHTML = `
+        <div style="text-align:center;border-bottom:1px dashed #000;padding-bottom:8px;margin-bottom:8px;">
+            <div style="font-size:16px;font-weight:900;letter-spacing:-0.5px;">${company.company_name || 'Cash-In Business'}</div>
+            <div style="font-size:11px;color:#555;">${company.city || 'Somalia'} • ${(company.business_type || 'General').toUpperCase()}</div>
+            <div style="font-size:11px;color:#555;">Code: ${company.company_code || '—'}</div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:6px;">
+            <span><b>Receipt #:</b> ${receiptNo}</span>
+            <span style="color:#555;">${dateStr}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:2px;">
+            <span><b>${isRec ? 'From (Customer):' : 'To (Recipient):'}</b></span>
+            <span>${party}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:2px;">
+            <span><b>Cashier:</b></span>
+            <span>${classBy}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:6px;">
+            <span><b>Provider:</b></span>
+            <span>${txn.provider || '—'}</span>
+        </div>
+        <div style="border-top:1px dashed #000;border-bottom:1px dashed #000;padding:6px 0;margin:8px 0;">
+            <table style="width:100%;font-size:11px;border-collapse:collapse;">
+                <thead><tr style="font-weight:700;border-bottom:1px solid #ddd;">
+                    <th style="padding:2px 4px;text-align:left;">Item</th>
+                    <th style="padding:2px 4px;text-align:center;">Qty</th>
+                    <th style="padding:2px 4px;text-align:right;">Amount</th>
+                </tr></thead>
+                <tbody>${itemsRows}</tbody>
+            </table>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:900;margin:6px 0;">
+            <span>TOTAL</span>
+            <span style="color:${isRec ? '#059669' : '#dc2626'};">${isRec ? '+' : '-'}${Number(txn.amount).toLocaleString(undefined, {minimumFractionDigits:2})} ${txn.currency}</span>
+        </div>
+        <div style="text-align:center;border-top:1px dashed #000;padding-top:8px;margin-top:8px;font-size:10px;color:#888;">
+            Thank you for your business!<br>
+            Powered by Cash-In Smart Ledger
+        </div>
+    `;
+
+    // Store receipt text for copy/WhatsApp
+    modal.dataset.receiptText = buildReceiptText(company, receiptNo, dateStr, party, classBy, txn);
+    modal.dataset.txnId = txn.id || '';
+    modal.classList.remove('hidden');
+}
+
+function buildReceiptText(company, receiptNo, dateStr, party, classBy, txn) {
+    const isRec = txn.type === 'Received';
+    return `🧾 *${company.company_name || 'Business'} — Receipt*\n` +
+        `No: ${receiptNo} | ${dateStr}\n` +
+        `${isRec ? 'Customer' : 'Recipient'}: ${party}\n` +
+        `Cashier: ${classBy}\n` +
+        `Provider: ${txn.provider || '—'}\n` +
+        `Category: ${txn.category || 'General'}\n` +
+        `─────────────────────\n` +
+        `*TOTAL: ${isRec ? '+' : '-'}${Number(txn.amount).toLocaleString(undefined, {minimumFractionDigits:2})} ${txn.currency}*\n` +
+        `─────────────────────\n` +
+        `Thank you! Powered by Cash-In`;
+}
+
+function initReceiptModalEvents() {
+    const modal    = document.getElementById('receipt-modal');
+    const closeBtn = document.getElementById('receipt-close-btn');
+    const overlay  = document.getElementById('receipt-overlay');
+    const printBtn = document.getElementById('print-receipt-btn');
+    const waBtn    = document.getElementById('whatsapp-receipt-btn');
+    const copyBtn  = document.getElementById('copy-receipt-btn');
+
+    if (!modal) return;
+    if (closeBtn) closeBtn.addEventListener('click', () => modal.classList.add('hidden'));
+    if (overlay)  overlay.addEventListener('click', () => modal.classList.add('hidden'));
+
+    if (printBtn) {
+        printBtn.addEventListener('click', () => {
+            window.print();
+        });
+    }
+    if (waBtn) {
+        waBtn.addEventListener('click', () => {
+            const text = modal.dataset.receiptText || '';
+            const url  = `https://wa.me/?text=${encodeURIComponent(text)}`;
+            window.open(url, '_blank');
+        });
+    }
+    if (copyBtn) {
+        copyBtn.addEventListener('click', async () => {
+            const text = modal.dataset.receiptText || '';
+            try {
+                await navigator.clipboard.writeText(text);
+                if (typeof window.showToast === 'function') window.showToast('Receipt copied to clipboard! 📋', 'success');
+            } catch(e) {
+                prompt('Copy this receipt text:', text);
+            }
+        });
+    }
+}
+
+window.openReceiptModal = openReceiptModal;
+
+
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/* FEATURE 4: Employee Tracking — Directory, Clock In/Out, Sales Report       */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+
+async function loadEmployees() {
+    try {
+        const res = await secureFetch('/api/employees');
+        if (!res.ok) return;
+        currentEmployees = await res.json();
+        renderEmployeeDirectory();
+    } catch(e) {
+        console.warn('Could not load employees', e);
+    }
+}
+
+function renderEmployeeDirectory() {
+    const listEl   = document.getElementById('employees-list');
+    const emptyEl  = document.getElementById('employees-empty');
+    const countEl  = document.getElementById('employee-count');
+
+    if (!listEl) return;
+    if (countEl) countEl.textContent = currentEmployees.length;
+    listEl.innerHTML = '';
+
+    if (currentEmployees.length === 0) {
+        if (emptyEl) emptyEl.style.display = 'block';
+        return;
+    }
+    if (emptyEl) emptyEl.style.display = 'none';
+
+    currentEmployees.forEach(emp => {
+        const card = document.createElement('div');
+        card.className = 'employee-card';
+        card.innerHTML = `
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                <div>
+                    <div style="font-weight:800;font-size:14px;color:#0f172a;">${emp.name}</div>
+                    <div style="font-size:12px;color:#6366f1;font-weight:600;">${emp.role || 'Staff'}</div>
+                    ${emp.phone ? `<div style="font-size:11px;color:#64748b;">${emp.phone}</div>` : ''}
+                </div>
+                <div style="display:flex;gap:6px;align-items:center;">
+                    <button class="btn btn-text btn-sm emp-edit-btn" data-id="${emp.id}" style="font-size:11px;color:#6366f1;">✏️ Edit</button>
+                    <button class="btn btn-text btn-sm emp-del-btn" data-id="${emp.id}" style="font-size:11px;color:#ef4444;">🗑️</button>
+                </div>
+            </div>
+            <div style="display:flex;gap:8px;margin-top:8px;">
+                <button class="btn btn-success btn-sm emp-checkin-btn" data-id="${emp.id}" data-name="${emp.name}" style="background:#10b981;color:#fff;border:none;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;">🟢 Clock In</button>
+                <button class="btn btn-secondary btn-sm emp-checkout-btn" data-id="${emp.id}" data-name="${emp.name}" style="background:#f1f5f9;color:#475569;border:1px solid #cbd5e1;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;">🔴 Clock Out</button>
+                <button class="btn btn-text btn-sm emp-select-btn" data-id="${emp.id}" data-name="${emp.name}" style="font-size:11px;color:#8b5cf6;font-weight:700;margin-left:auto;">Set as Cashier</button>
+            </div>
+        `;
+
+        // Edit
+        card.querySelector('.emp-edit-btn').addEventListener('click', () => openEmployeeModal(emp));
+        // Delete
+        card.querySelector('.emp-del-btn').addEventListener('click', async () => {
+            if (!confirm(`Delete ${emp.name}?`)) return;
+            const r = await secureFetch(`/api/employees/${emp.id}`, { method: 'DELETE' });
+            if (r.ok) { loadEmployees(); }
+        });
+        // Clock In
+        card.querySelector('.emp-checkin-btn').addEventListener('click', async () => {
+            await recordAttendance(emp.id, 'check_in');
+            activeCashierEmployee = emp.name;
+            if (typeof window.showToast === 'function') window.showToast(`🟢 ${emp.name} clocked in`, 'success');
+            loadEmployeeAttendance();
+        });
+        // Clock Out
+        card.querySelector('.emp-checkout-btn').addEventListener('click', async () => {
+            await recordAttendance(emp.id, 'check_out');
+            if (typeof window.showToast === 'function') window.showToast(`🔴 ${emp.name} clocked out`, 'success');
+            loadEmployeeAttendance();
+        });
+        // Set as active cashier
+        card.querySelector('.emp-select-btn').addEventListener('click', () => {
+            activeCashierEmployee = emp.name;
+            if (typeof window.showToast === 'function') window.showToast(`👤 ${emp.name} set as active cashier`, 'success');
+        });
+
+        listEl.appendChild(card);
+    });
+}
+
+async function recordAttendance(employeeId, action) {
+    try {
+        await secureFetch(`/api/employees/${employeeId}/attendance`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action })
+        });
+    } catch(e) {
+        console.warn('Attendance record error', e);
+    }
+}
+
+async function loadEmployeeAttendance() {
+    try {
+        const res = await secureFetch('/api/employees/attendance?limit=30');
+        if (!res.ok) return;
+        const logs = await res.json();
+        renderAttendanceLog(logs);
+    } catch(e) {}
+}
+
+function renderAttendanceLog(logs) {
+    const tbody = document.getElementById('attendance-log-tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+    if (!logs || logs.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;color:#64748b;padding:14px;">No attendance records today.</td></tr>';
+        return;
+    }
+    logs.forEach(log => {
+        const tr = document.createElement('tr');
+        const timeStr = new Date(log.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+        tr.innerHTML = `
+            <td>${log.employee_name || '—'}</td>
+            <td><span style="font-weight:700;color:${log.action === 'check_in' ? '#10b981' : '#ef4444'};">${log.action === 'check_in' ? '🟢 Clock In' : '🔴 Clock Out'}</span></td>
+            <td>${timeStr}</td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+async function loadEmployeeSalesReport() {
+    try {
+        const res = await secureFetch('/api/employees/sales-report');
+        if (!res.ok) return;
+        const data = await res.json();
+        const tbody = document.getElementById('employee-sales-tbody');
+        if (!tbody) return;
+        tbody.innerHTML = '';
+        const rows = Array.isArray(data) ? data : (data.report || []);
+        if (rows.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#64748b;padding:20px;">No employee sales recorded yet.</td></tr>';
+            return;
+        }
+        rows.forEach(row => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td style="font-weight:700;">${row.employee_name || '—'}</td>
+                <td>${row.role || '—'}</td>
+                <td style="text-align:center;font-weight:700;">${row.transaction_count || 0}</td>
+                <td style="font-weight:700;color:#10b981;">$${Number(row.total_volume || 0).toLocaleString(undefined, {minimumFractionDigits:2})}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+    } catch(e) {}
+}
+
+function openEmployeeModal(emp = null) {
+    const modal    = document.getElementById('employee-modal');
+    const title    = document.getElementById('employee-modal-title');
+    const editId   = document.getElementById('emp-edit-id');
+    const nameEl   = document.getElementById('emp-name');
+    const roleEl   = document.getElementById('emp-role');
+    const pinEl    = document.getElementById('emp-pin');
+    const phoneEl  = document.getElementById('emp-phone');
+    if (!modal) return;
+
+    if (emp) {
+        if (title)  title.textContent = 'Edit Employee';
+        if (editId) editId.value = emp.id;
+        if (nameEl) nameEl.value  = emp.name || '';
+        if (roleEl) roleEl.value  = emp.role || 'Cashier';
+        if (pinEl)  pinEl.value   = emp.pin_code || '';
+        if (phoneEl) phoneEl.value = emp.phone || '';
+    } else {
+        if (title)  title.textContent = 'Add New Employee';
+        if (editId) editId.value = '';
+        if (nameEl) nameEl.value  = '';
+        if (roleEl) roleEl.value  = 'Cashier';
+        if (pinEl)  pinEl.value   = '1234';
+        if (phoneEl) phoneEl.value = '';
+    }
+    modal.classList.remove('hidden');
+}
+
+function initEmployeeEvents() {
+    // Global Clock In / Out header buttons
+    const clockInBtn  = document.getElementById('clock-in-btn');
+    const clockOutBtn = document.getElementById('clock-out-btn');
+    if (clockInBtn) {
+        clockInBtn.addEventListener('click', async () => {
+            if (!activeCashierEmployee && currentEmployees.length > 0) {
+                activeCashierEmployee = currentEmployees[0].name;
+            }
+            if (!activeCashierEmployee) { alert('No employee selected. Please add an employee first.'); return; }
+            const emp = currentEmployees.find(e => e.name === activeCashierEmployee);
+            if (emp) {
+                await recordAttendance(emp.id, 'check_in');
+                if (typeof window.showToast === 'function') window.showToast(`🟢 ${activeCashierEmployee} clocked in`, 'success');
+                loadEmployeeAttendance();
+            }
+        });
+    }
+    if (clockOutBtn) {
+        clockOutBtn.addEventListener('click', async () => {
+            if (!activeCashierEmployee) { alert('No active cashier selected.'); return; }
+            const emp = currentEmployees.find(e => e.name === activeCashierEmployee);
+            if (emp) {
+                await recordAttendance(emp.id, 'check_out');
+                if (typeof window.showToast === 'function') window.showToast(`🔴 ${activeCashierEmployee} clocked out`, 'success');
+                loadEmployeeAttendance();
+            }
+        });
+    }
+
+    // Add Employee button
+    const addEmpBtn = document.getElementById('add-employee-btn');
+    if (addEmpBtn) addEmpBtn.addEventListener('click', () => openEmployeeModal());
+
+    // Employee Modal: close
+    const modal    = document.getElementById('employee-modal');
+    const closeBtn = document.getElementById('employee-close-btn');
+    const overlay  = document.getElementById('employee-overlay');
+    if (closeBtn) closeBtn.addEventListener('click', () => modal && modal.classList.add('hidden'));
+    if (overlay)  overlay.addEventListener('click', () => modal && modal.classList.add('hidden'));
+
+    // Employee Form submit
+    const form = document.getElementById('employee-form');
+    if (form) {
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const editId = document.getElementById('emp-edit-id')?.value;
+            const payload = {
+                name:    document.getElementById('emp-name')?.value.trim(),
+                role:    document.getElementById('emp-role')?.value,
+                pin_code: document.getElementById('emp-pin')?.value,
+                phone:   document.getElementById('emp-phone')?.value.trim(),
+                permissions: {
+                    classify: document.getElementById('perm-classify')?.checked,
+                    reports:  document.getElementById('perm-reports')?.checked,
+                    items:    document.getElementById('perm-items')?.checked,
+                    delete:   document.getElementById('perm-delete')?.checked,
+                }
+            };
+            const url    = editId ? `/api/employees/${editId}` : '/api/employees';
+            const method = editId ? 'PUT' : 'POST';
+            const res = await secureFetch(url, {
+                method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            if (res.ok) {
+                if (modal) modal.classList.add('hidden');
+                if (typeof window.showToast === 'function') window.showToast(`✅ Employee ${editId ? 'updated' : 'added'}!`, 'success');
+                loadEmployees();
+            }
+        });
+    }
+}
+
+window.loadEmployees = loadEmployees;
+window.loadEmployeeAttendance = loadEmployeeAttendance;
+window.loadEmployeeSalesReport = loadEmployeeSalesReport;
+
+
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/* FEATURE 5: Offline Mode — Local Queue, Status Badge, Auto-Sync             */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+
+function initOfflineSyncManager() {
+    const badge = document.getElementById('network-status-badge');
+
+    function updateBadge() {
+        if (!badge) return;
+        const pending = getOfflineQueue().length;
+        if (navigator.onLine) {
+            if (pending > 0) {
+                badge.className = 'network-status-badge syncing';
+                badge.textContent = `🟡 Syncing (${pending})`;
+            } else {
+                badge.className = 'network-status-badge online';
+                badge.textContent = '🟢 Online';
+            }
+        } else {
+            badge.className = 'network-status-badge offline';
+            badge.textContent = pending > 0 ? `🔴 Offline (${pending} pending)` : '🔴 Offline';
+        }
+    }
+
+    window.addEventListener('online',  () => { updateBadge(); syncOfflineQueue(); });
+    window.addEventListener('offline', () => updateBadge());
+
+    // Poll every 15 seconds
+    setInterval(() => { if (navigator.onLine) syncOfflineQueue(); }, 15000);
+    updateBadge();
+}
+
+function getOfflineQueue() {
+    try { return JSON.parse(localStorage.getItem('cashin_offline_queue') || '[]'); }
+    catch(e) { return []; }
+}
+
+function saveOfflineQueue(q) {
+    localStorage.setItem('cashin_offline_queue', JSON.stringify(q));
+}
+
+function queueOfflineAction(action) {
+    const q = getOfflineQueue();
+    action._queued_at = new Date().toISOString();
+    q.push(action);
+    saveOfflineQueue(q);
+    offlineQueue = q;
+    document.getElementById('network-status-badge') && initOfflineSyncManager && updateOfflineBadge();
+}
+
+function updateOfflineBadge() {
+    const badge = document.getElementById('network-status-badge');
+    if (!badge) return;
+    const pending = getOfflineQueue().length;
+    if (!navigator.onLine) {
+        badge.className = 'network-status-badge offline';
+        badge.textContent = pending > 0 ? `🔴 Offline (${pending} pending)` : '🔴 Offline';
+    } else if (pending > 0) {
+        badge.className = 'network-status-badge syncing';
+        badge.textContent = `🟡 Syncing (${pending})`;
+    } else {
+        badge.className = 'network-status-badge online';
+        badge.textContent = '🟢 Online';
+    }
+}
+
+async function syncOfflineQueue() {
+    const q = getOfflineQueue();
+    if (q.length === 0) return;
+
+    const badge = document.getElementById('network-status-badge');
+    if (badge) { badge.className = 'network-status-badge syncing'; badge.textContent = `🟡 Syncing (${q.length})…`; }
+
+    const remaining = [];
+    for (const action of q) {
+        try {
+            let ok = false;
+            if (action.type === 'classify') {
+                const res = await secureFetch(`/api/transactions/${action.txnId}/classify`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(action.payload)
+                });
+                ok = res.ok;
+            }
+            if (!ok) remaining.push(action);
+        } catch(e) {
+            remaining.push(action);
+        }
+    }
+
+    saveOfflineQueue(remaining);
+    updateOfflineBadge();
+
+    if (remaining.length === 0 && typeof window.showToast === 'function') {
+        window.showToast('✅ All offline actions synced!', 'success');
+    }
+}
+
+window.queueOfflineAction = queueOfflineAction;
