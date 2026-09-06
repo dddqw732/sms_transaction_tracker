@@ -165,6 +165,10 @@
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
                     <span>Menu & Products</span>
                 </button>
+                <button class="nav-btn" data-target="tab-employees" data-title="Employees" id="nav-employees-btn">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                    <span>Employees</span>
+                </button>
                 <button class="nav-btn" data-target="tab-settings" data-title="Settings">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
                     <span>Settings</span>
@@ -179,6 +183,10 @@
                     <span id="header-business-badge" class="business-badge">Restaurant</span>
                 </div>
                 <div class="header-actions">
+                    <div id="network-status-badge" class="network-status-badge online" title="Real-time Network & Sync Status">
+                        <span class="net-dot"></span>
+                        <span id="network-status-text">Online</span>
+                    </div>
                     <div class="current-time" id="live-time">June 24, 2026</div>
                     <div id="company-chip" class="company-chip">---</div>
                     <button id="logout-btn" class="btn btn-text">Logout</button>
@@ -276,8 +284,7 @@
                             <option value="">All Providers</option>
                             <option value="ZAAD">ZAAD</option>
                             <option value="eDahab">eDahab</option>
-                            <option value="EVC Plus">EVC Plus</option>
-                            <option value="Sahal">Sahal</option>
+                            <option value="Soltelco">Soltelco</option>
                         </select>
                         <select id="category-filter" class="custom-select">
                             <option value="">All Categories</option>
@@ -471,7 +478,9 @@
                                     <th>Provider</th>
                                     <th>Party / Phone</th>
                                     <th>Category</th>
+                                    <th>Items / Breakdown</th>
                                     <th>Amount</th>
+                                    <th style="text-align:center;">Receipt</th>
                                 </tr>
                             </thead>
                             <tbody id="statement-txns-tbody">
@@ -530,7 +539,10 @@
                     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
                         <button id="reset-catalog-btn" class="btn btn-secondary" style="display:none;">Reset to Defaults</button>
                         <button id="seed-somali-menu-btn" class="btn btn-secondary" style="background:rgba(99,102,241,0.08);color:#6366f1;border:1px solid rgba(99,102,241,0.25);">🍽️ Load Somali Menu</button>
-                        <button id="add-catalog-item-btn" class="btn btn-primary">+ Add New Item</button>
+                        <button id="open-import-hub-btn" class="btn btn-primary" style="display:flex;align-items:center;gap:6px;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12l7 7 7-7"/><path d="M5 19h14"/></svg>
+                            <span>+ Add Items</span>
+                        </button>
                     </div>
                 </div>
                 
@@ -580,6 +592,107 @@
                 </div>
             </section>
 
+            <!-- TAB: EMPLOYEES & ATTENDANCE -->
+            <section id="tab-employees" class="tab-content">
+                <div class="employees-header-row" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px;">
+                    <div>
+                        <h3 style="margin:0 0 4px 0;font-size:20px;font-weight:800;color:#0f172a;">👥 Employee Profiles & Attendance</h3>
+                        <p class="text-muted" style="margin:0;font-size:13px;">Manage staff roles, track live clock-in/out attendance, and view sales performance per employee.</p>
+                    </div>
+                    <button id="add-employee-btn" class="btn btn-primary" style="display:flex;align-items:center;gap:6px;">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                        <span>+ Add Employee</span>
+                    </button>
+                </div>
+
+                <!-- Quick Punch-Clock / Attendance Tracker Card -->
+                <div class="attendance-punch-card" style="background:#ffffff;border:1px solid #e2e8f0;border-radius:14px;padding:20px;margin-bottom:24px;box-shadow:0 1px 3px rgba(0,0,0,0.03);">
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
+                        <div style="display:flex;align-items:center;gap:10px;">
+                            <div style="width:36px;height:36px;border-radius:10px;background:rgba(99,102,241,0.1);display:flex;align-items:center;justify-content:center;color:#6366f1;">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                            </div>
+                            <div>
+                                <h4 style="margin:0;font-size:15px;font-weight:800;color:#0f172a;">Staff Clock-In / Clock-Out</h4>
+                                <span style="font-size:12px;color:#64748b;">Tap Check In at start of shift and Check Out when finished.</span>
+                            </div>
+                        </div>
+                        <div id="attendance-status-msg" style="font-size:12px;font-weight:700;color:#10b981;"></div>
+                    </div>
+
+                    <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+                        <div style="flex:1;min-width:220px;">
+                            <select id="attendance-employee-select" class="custom-select" style="font-weight:600;">
+                                <option value="">Select Employee...</option>
+                            </select>
+                        </div>
+                        <button id="clock-in-btn" class="btn btn-success" style="background:#10b981;color:#fff;border:none;padding:10px 20px;font-weight:700;border-radius:8px;display:flex;align-items:center;gap:6px;">
+                            <span>🟢 Check In</span>
+                        </button>
+                        <button id="clock-out-btn" class="btn btn-secondary" style="background:#f1f5f9;color:#475569;border:1px solid #cbd5e1;padding:10px 20px;font-weight:700;border-radius:8px;display:flex;align-items:center;gap:6px;">
+                            <span>🔴 Check Out</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Two-Column Layout: Employee Directory & Performance -->
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:20px;margin-bottom:24px;">
+                    <!-- Column 1: Staff Directory -->
+                    <div>
+                        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+                            <h4 style="margin:0;font-size:15px;font-weight:800;color:#0f172a;">Staff Directory (<span id="employee-count">0</span>)</h4>
+                        </div>
+                        <div id="employees-list" style="display:flex;flex-direction:column;gap:12px;">
+                            <!-- Populated dynamically -->
+                            <div class="empty-state" id="employees-empty"><p>No employees registered. Click "+ Add Employee" above to add your team members.</p></div>
+                        </div>
+                    </div>
+
+                    <!-- Column 2: Sales & Classification Performance -->
+                    <div>
+                        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+                            <h4 style="margin:0;font-size:15px;font-weight:800;color:#0f172a;">Sales Attributed to Staff</h4>
+                        </div>
+                        <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:14px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.02);">
+                            <table class="statement-table" style="font-size:12px;width:100%;">
+                                <thead>
+                                    <tr>
+                                        <th>Staff Name</th>
+                                        <th>Role</th>
+                                        <th>Sales Count</th>
+                                        <th>Total Volume</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="employee-sales-tbody">
+                                    <!-- Populated dynamically -->
+                                    <tr><td colspan="4" style="text-align:center;color:#64748b;padding:20px;">No employee sales recorded yet.</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Recent Attendance Log -->
+                        <div style="margin-top:20px;">
+                            <h4 style="margin:0 0 12px 0;font-size:15px;font-weight:800;color:#0f172a;">Recent Attendance Logs</h4>
+                            <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:14px;overflow:hidden;max-height:260px;overflow-y:auto;">
+                                <table class="statement-table" style="font-size:11px;width:100%;">
+                                    <thead>
+                                        <tr>
+                                            <th>Staff</th>
+                                            <th>Action</th>
+                                            <th>Time</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="attendance-log-tbody">
+                                        <!-- Populated dynamically -->
+                                        <tr><td colspan="3" style="text-align:center;color:#64748b;padding:14px;">No attendance records today.</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
             <!-- TAB 6: SETTINGS -->
             <section id="tab-settings" class="tab-content">
                 <div class="settings-grid">
@@ -614,7 +727,7 @@
 
                     <div class="settings-card">
                         <h3>SMS Webhook Integration</h3>
-                        <p class="text-muted">Connect your Android phone or forwarder app to capture ZAAD, eDahab, EVC Plus, and Sahal SMS instantly.</p>
+                        <p class="text-muted">Connect your Android phone or forwarder app to capture ZAAD, eDahab, and Soltelco SMS instantly.</p>
                         <div class="input-group" style="margin-top:12px;">
                             <label>Your Webhook URL</label>
                             <div style="display:flex;gap:8px;align-items:center;">
@@ -699,10 +812,9 @@
                     <div class="form-group">
                         <label>Provider / Method</label>
                         <select id="man-provider" class="custom-select">
-                            <option value="eDahab">eDahab</option>
                             <option value="ZAAD">ZAAD</option>
-                            <option value="EVC Plus">EVC Plus</option>
-                            <option value="Sahal">Sahal</option>
+                            <option value="eDahab">eDahab</option>
+                            <option value="Soltelco">Soltelco</option>
                             <option value="Cash">Cash / Hand</option>
                             <option value="Bank">Bank Transfer</option>
                         </select>
@@ -810,6 +922,282 @@
         </div>
     </div>
 
+    <!-- IMPORT ITEMS HUB MODAL -->
+    <div id="import-items-modal" class="modal hidden">
+        <div class="modal-overlay" id="import-overlay"></div>
+        <div class="modal-container modal-lg">
+            <div class="modal-header">
+                <div>
+                    <h3 style="margin:0;font-size:18px;font-weight:800;color:#0f172a;">📥 Add Products & Menu Items</h3>
+                    <p class="text-muted" style="margin:2px 0 0 0;font-size:12px;">Choose an import method to easily add multiple items at once or enter manually.</p>
+                </div>
+                <button class="close-btn" id="import-close-btn">&times;</button>
+            </div>
+            <div class="modal-body" style="padding-top:10px;">
+                <!-- Method Selector Cards -->
+                <div class="import-methods-tabs" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:18px;">
+                    <button class="import-method-card active" data-method="scan" type="button">
+                        <span style="font-size:24px;">📷</span>
+                        <span style="font-weight:700;font-size:13px;">Scan Menu</span>
+                        <span style="font-size:11px;color:#64748b;">Photo OCR/AI</span>
+                    </button>
+                    <button class="import-method-card" data-method="sheet" type="button">
+                        <span style="font-size:24px;">📄</span>
+                        <span style="font-weight:700;font-size:13px;">Upload Spreadsheet</span>
+                        <span style="font-size:11px;color:#64748b;">Excel / CSV</span>
+                    </button>
+                    <button class="import-method-card" data-method="manual" type="button">
+                        <span style="font-size:24px;">✍️</span>
+                        <span style="font-weight:700;font-size:13px;">Add Manually</span>
+                        <span style="font-size:11px;color:#64748b;">Single Item</span>
+                    </button>
+                    <button class="import-method-card restaurant-only-method" data-method="somali" id="import-somali-tab-btn" type="button" style="display:none;">
+                        <span style="font-size:24px;">🍽️</span>
+                        <span style="font-weight:700;font-size:13px;">Somali Menu</span>
+                        <span style="font-size:11px;color:#64748b;">Restaurant Presets</span>
+                    </button>
+                </div>
+
+                <!-- Method 1: Scan Menu -->
+                <div id="import-panel-scan" class="import-panel">
+                    <div style="background:#f8fafc;border:2px dashed #cbd5e1;border-radius:12px;padding:20px;text-align:center;margin-bottom:16px;">
+                        <input type="file" id="scan-menu-input" accept="image/*" style="display:none;">
+                        <button class="btn btn-secondary" id="trigger-scan-btn" type="button" style="margin-bottom:8px;">
+                            📷 Take Photo or Select Menu Image
+                        </button>
+                        <p style="font-size:12px;color:#64748b;margin:0;">Upload a clear photo of your printed or handwritten menu / product list.</p>
+                        <div id="scan-preview-container" class="hidden" style="margin-top:14px;">
+                            <img id="scan-preview-img" style="max-height:160px;border-radius:8px;border:1px solid #cbd5e1;" alt="Menu Preview">
+                            <div style="margin-top:10px;">
+                                <button id="run-ocr-btn" class="btn btn-primary btn-sm" type="button">⚡ Extract Items & Prices</button>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Preview Table for Extracted Items -->
+                    <div id="scan-results-container" class="hidden">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                            <span style="font-size:13px;font-weight:700;color:#0f172a;" id="scan-count-badge">Detected Items (0)</span>
+                            <button id="add-scan-row-btn" class="btn btn-text btn-sm" type="button" style="color:#6366f1;font-weight:700;">+ Add Row</button>
+                        </div>
+                        <div style="max-height:200px;overflow-y:auto;border:1px solid #e2e8f0;border-radius:8px;">
+                            <table class="statement-table" id="scan-items-table" style="font-size:12px;width:100%;">
+                                <thead>
+                                    <tr>
+                                        <th>Item Name</th>
+                                        <th>Category</th>
+                                        <th>Price</th>
+                                        <th>Currency</th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="scan-items-tbody"></tbody>
+                            </table>
+                        </div>
+                        <button id="confirm-scan-import-btn" class="btn btn-success btn-full" type="button" style="margin-top:12px;background:#10b981;color:#fff;border:none;">
+                            Confirm & Save Extracted Items
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Method 2: Upload Spreadsheet -->
+                <div id="import-panel-sheet" class="import-panel hidden">
+                    <div style="background:#f8fafc;border:2px dashed #cbd5e1;border-radius:12px;padding:20px;text-align:center;margin-bottom:16px;">
+                        <input type="file" id="spreadsheet-file-input" accept=".xlsx, .xls, .csv" style="display:none;">
+                        <button class="btn btn-secondary" id="trigger-sheet-btn" type="button" style="margin-bottom:8px;">
+                            📄 Choose Excel (.xlsx) or CSV File
+                        </button>
+                        <p style="font-size:12px;color:#64748b;margin:0;">Automatically recognizes columns: Name, Category, Price, Description, SKU</p>
+                        <div id="sheet-filename" style="font-weight:700;font-size:12px;color:#6366f1;margin-top:8px;"></div>
+                    </div>
+
+                    <!-- Column Mapping -->
+                    <div id="sheet-mapping-row" class="hidden" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;background:#f1f5f9;padding:10px;border-radius:8px;margin-bottom:12px;">
+                        <div>
+                            <label style="font-size:11px;font-weight:700;display:block;">Item Name</label>
+                            <select id="map-col-name" class="custom-select" style="font-size:11px;padding:4px;"></select>
+                        </div>
+                        <div>
+                            <label style="font-size:11px;font-weight:700;display:block;">Price</label>
+                            <select id="map-col-price" class="custom-select" style="font-size:11px;padding:4px;"></select>
+                        </div>
+                        <div>
+                            <label style="font-size:11px;font-weight:700;display:block;">Category</label>
+                            <select id="map-col-category" class="custom-select" style="font-size:11px;padding:4px;"></select>
+                        </div>
+                        <div>
+                            <label style="font-size:11px;font-weight:700;display:block;">SKU / Code</label>
+                            <select id="map-col-sku" class="custom-select" style="font-size:11px;padding:4px;"></select>
+                        </div>
+                    </div>
+
+                    <!-- Spreadsheet Items Preview -->
+                    <div id="sheet-preview-container" class="hidden">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                            <span style="font-size:13px;font-weight:700;color:#0f172a;" id="sheet-count-badge">Items to Import (0)</span>
+                        </div>
+                        <div style="max-height:200px;overflow-y:auto;border:1px solid #e2e8f0;border-radius:8px;">
+                            <table class="statement-table" id="sheet-items-table" style="font-size:12px;width:100%;">
+                                <thead>
+                                    <tr>
+                                        <th>Item Name</th>
+                                        <th>Category</th>
+                                        <th>Price</th>
+                                        <th>SKU</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="sheet-items-tbody"></tbody>
+                            </table>
+                        </div>
+                        <button id="confirm-sheet-import-btn" class="btn btn-success btn-full" type="button" style="margin-top:12px;background:#10b981;color:#fff;border:none;">
+                            Confirm & Import All Items
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Method 3: Add Manually -->
+                <div id="import-panel-manual" class="import-panel hidden">
+                    <form id="quick-manual-item-form">
+                        <div class="form-row" style="display:flex;gap:12px;">
+                            <div class="form-group" style="flex:2;">
+                                <label>Item / Product Name *</label>
+                                <input type="text" id="qman-name" class="custom-input" placeholder="e.g. Sambuus Hilib, Paracetamol, Shirt" required>
+                            </div>
+                            <div class="form-group" style="flex:1;">
+                                <label>Category *</label>
+                                <input type="text" id="qman-category" class="custom-input" placeholder="e.g. Starters, Food, Medicine" required>
+                            </div>
+                        </div>
+                        <div class="form-row" style="display:flex;gap:12px;">
+                            <div class="form-group" style="flex:2;">
+                                <label>Price *</label>
+                                <input type="number" id="qman-price" class="custom-input" placeholder="0.00" min="0" step="any" required>
+                            </div>
+                            <div class="form-group" style="flex:1;">
+                                <label>Currency</label>
+                                <select id="qman-currency" class="custom-select">
+                                    <option value="USD">USD ($)</option>
+                                    <option value="SLSH">SLSH</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-row" style="display:flex;gap:12px;">
+                            <div class="form-group" style="flex:1;">
+                                <label>SKU / Barcode (Optional)</label>
+                                <input type="text" id="qman-sku" class="custom-input" placeholder="e.g. 10042">
+                            </div>
+                            <div class="form-group" style="flex:2;">
+                                <label>Description (Optional)</label>
+                                <input type="text" id="qman-desc" class="custom-input" placeholder="Brief note or description">
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-full" style="margin-top:10px;">Save & Add to Catalog</button>
+                    </form>
+                </div>
+
+                <!-- Method 4: Somali Menu (Restaurant Preset) -->
+                <div id="import-panel-somali" class="import-panel hidden">
+                    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px;margin-bottom:14px;">
+                        <h4 style="margin:0 0 6px 0;font-size:14px;font-weight:800;color:#0f172a;">🍽️ Somali Restaurant Menu Presets</h4>
+                        <p style="font-size:12px;color:#64748b;margin:0;">Includes standard Somali dishes: Bariis iyo Hilib, Baasto Saldaato, Canjeero, Sambuus, Shaah Caleen, and more with realistic pricing.</p>
+                    </div>
+                    <button id="import-somali-preset-confirm-btn" class="btn btn-primary btn-full" type="button">
+                        🍽️ Load Full Somali Restaurant Menu
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- RECEIPT MODAL (POS THERMAL RECEIPT FORMAT) -->
+    <div id="receipt-modal" class="modal hidden">
+        <div class="modal-overlay" id="receipt-overlay"></div>
+        <div class="modal-container modal-sm" style="max-width:440px;">
+            <div class="modal-header" style="border-bottom:none;padding-bottom:0;">
+                <h3 style="font-size:16px;font-weight:800;color:#0f172a;">🧾 Transaction Receipt</h3>
+                <button class="close-btn" id="receipt-close-btn">&times;</button>
+            </div>
+            <div class="modal-body" style="padding-top:10px;">
+                <!-- Printable Thermal Slip Container -->
+                <div id="thermal-receipt-slip" class="thermal-receipt-slip">
+                    <!-- Populated dynamically -->
+                </div>
+                <!-- Action buttons -->
+                <div style="display:flex;flex-direction:column;gap:8px;margin-top:16px;">
+                    <button id="print-receipt-btn" class="btn btn-primary btn-full" type="button" style="display:flex;align-items:center;justify-content:center;gap:8px;">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+                        <span>Print Receipt (Thermal POS)</span>
+                    </button>
+                    <div style="display:flex;gap:8px;">
+                        <button id="whatsapp-receipt-btn" class="btn btn-success btn-full" type="button" style="background:#25D366;color:#fff;border:none;display:flex;align-items:center;justify-content:center;gap:6px;">
+                            <span>💬 WhatsApp</span>
+                        </button>
+                        <button id="copy-receipt-btn" class="btn btn-secondary btn-full" type="button" style="display:flex;align-items:center;justify-content:center;gap:6px;">
+                            <span>📋 Copy Text</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- EMPLOYEE PROFILE MODAL -->
+    <div id="employee-modal" class="modal hidden">
+        <div class="modal-overlay" id="employee-overlay"></div>
+        <div class="modal-container" style="max-width:480px;">
+            <div class="modal-header">
+                <h3 id="employee-modal-title">Add New Employee</h3>
+                <button class="close-btn" id="employee-close-btn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="employee-form">
+                    <input type="hidden" id="emp-edit-id">
+                    <div class="form-group">
+                        <label>Full Name *</label>
+                        <input type="text" id="emp-name" class="custom-input" placeholder="e.g. Ahmed Ali" required>
+                    </div>
+                    <div class="form-row" style="display:flex;gap:10px;">
+                        <div class="form-group" style="flex:1;">
+                            <label>Role</label>
+                            <select id="emp-role" class="custom-select">
+                                <option value="Cashier">Cashier</option>
+                                <option value="Waiter">Waiter / Server</option>
+                                <option value="Manager">Manager</option>
+                                <option value="Accountant">Accountant</option>
+                                <option value="Admin">Admin</option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="flex:1;">
+                            <label>PIN Code</label>
+                            <input type="text" id="emp-pin" class="custom-input" placeholder="1234" value="1234">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Phone Number</label>
+                        <input type="text" id="emp-phone" class="custom-input" placeholder="e.g. 0634123456">
+                    </div>
+                    <div class="form-group">
+                        <label style="display:block;margin-bottom:8px;">Permissions</label>
+                        <div style="display:flex;flex-direction:column;gap:6px;font-size:13px;">
+                            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                                <input type="checkbox" id="perm-classify" checked> Can Classify Payments & Orders
+                            </label>
+                            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                                <input type="checkbox" id="perm-reports" checked> Can View Financial Reports & Statements
+                            </label>
+                            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                                <input type="checkbox" id="perm-items"> Can Add & Edit Catalog Items
+                            </label>
+                            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                                <input type="checkbox" id="perm-delete"> Can Delete Transactions / Invoices
+                            </label>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-full" style="margin-top:12px;">Save Employee</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <!-- NOTIFICATION POPUP (WEBSOCKET REALTIME NOTIFICATION) -->
     <div id="notification-popup" class="notification-popup hidden">
         <div class="notification-content">
@@ -826,7 +1214,9 @@
 
     <div id="toast-container" class="toast-container"></div>
 
-    <script src="app.js?v=11"></script>
-    <script src="new_features.js?v=4"></script>
+    <!-- SheetJS for Browser-Side Excel & CSV Parsing -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="app.js?v=12"></script>
+    <script src="new_features.js?v=5"></script>
 </body>
 </html>
